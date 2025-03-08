@@ -295,6 +295,14 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
 
+    #if defined LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW && LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW == 1
+    if (checkExecArg0BufferOverflow(argv, executablePath, processedExecutablePath, interpreterSet) != 0) {
+        return -1;
+    }
+    #endif
+
+
+
     if (debugLoggingEnabled) {
         logErrorVerbose(LOG_TAG, "Calling syscall execve");
         logErrorVerbose(LOG_TAG, "executable = '%s'", executablePath);
@@ -651,6 +659,48 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
 
     // Null terminate.
     newArgv[index] = NULL;
+
+    return 0;
+}
+
+
+
+int checkExecArg0BufferOverflow(char *const *argv,
+    const char *executablePath, const char *processedExecutablePath,
+    bool interpreterSet) {
+    logErrorVVerbose(LOG_TAG, "Checking argv[0] buffer overflow");
+
+    size_t argv0Length = strlen(argv[0]);
+    if (argv0Length >= 128) {
+        int androidBuildVersionSdk = android_buildVersionSdk_get();
+        if (androidBuildVersionSdk < 23) {
+            bool shouldAbort = false;
+            char* label = "";
+            if (interpreterSet) {
+                char interpreterHeader[TERMUX__FILE_HEADER__BUFFER_SIZE];
+                ssize_t interpreterHeaderLength = readFileHeader("interpreter", executablePath, interpreterHeader, sizeof(interpreterHeader));
+                if (interpreterHeaderLength < 0) {
+                    return interpreterHeaderLength;
+                }
+
+                if (isElfFile(interpreterHeader, interpreterHeaderLength)) {
+                    shouldAbort = true;
+                    label = "interpreted";
+                }
+            } else {
+                // Is elf.
+                shouldAbort = true;
+                label = "executable";
+            }
+
+            if (shouldAbort) {
+                logStrerrorDebug(LOG_TAG, "Cannot execute %s file '%s' as argv[0] '%s' length '%zu' is '>= 128' while running on Android SDK %d",
+                    label, processedExecutablePath, argv[0], argv0Length, androidBuildVersionSdk);
+                errno = ENAMETOOLONG;
+                return -1;
+            }
+        }
+    }
 
     return 0;
 }

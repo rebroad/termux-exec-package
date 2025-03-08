@@ -1,3 +1,4 @@
+#include <termux/termux_core__nos__c/v1/android/shell/command/environment/AndroidShellEnvironment.h>
 #include <termux/termux_core__nos__c/v1/unix/file/UnixFileUtils.h>
 
 #include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecVariantsIntercept.h>
@@ -181,8 +182,8 @@ FEXECVE_CALL_IMPL()
     } else ((void)0)
 
 #define runAllExecWrappersTest(testName,                                                           \
-    expectedReturnValue, expectedErrno,                                                            \
-    expectedExitCode, expectedOutputRegex, expectedOutputRegexFlags,                               \
+    expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,                      \
+    expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags, \
     file, path, envp, ...)                                                                         \
     if (1) {                                                                                       \
                                                                                                    \
@@ -204,8 +205,8 @@ FEXECVE_CALL_IMPL()
     }                                                                                              \
     {                                                                                              \
         /* ExecLP */                                                                               \
-        runExecTest(testName, expectedReturnValue, expectedErrno,                                  \
-            expectedExitCode, expectedOutputRegex, expectedOutputRegexFlags,                       \
+        runExecTest(testName, expectedReturnValueP, expectedErrnoP,                                \
+            expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                     \
             ExecLP, file, NULL, file, __VA_ARGS__);                                                \
     }                                                                                              \
     {                                                                                              \
@@ -224,14 +225,14 @@ FEXECVE_CALL_IMPL()
     }                                                                                              \
     {                                                                                              \
         /* ExecVP */                                                                               \
-        runExecTest(testName, expectedReturnValue, expectedErrno,                                  \
-            expectedExitCode, expectedOutputRegex, expectedOutputRegexFlags,                       \
+        runExecTest(testName, expectedReturnValueP, expectedErrnoP,                                \
+            expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                     \
             ExecVP, file, NULL, file, __VA_ARGS__);                                                \
     }                                                                                              \
     {                                                                                              \
         /* ExecVPE */                                                                              \
-        runExecTest(testName, expectedReturnValue, expectedErrno,                                  \
-            expectedExitCode, expectedOutputRegex, expectedOutputRegexFlags,                       \
+        runExecTest(testName, expectedReturnValueP, expectedErrnoP,                                \
+            expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                     \
             ExecVPE, file, envp, file, __VA_ARGS__);                                               \
     }                                                                                              \
                                                                                                    \
@@ -318,8 +319,8 @@ void test__execIntercept__Basic() {
     logVVerbose(LOG_TAG, "test__execIntercept__Basic()");
 
     runAllExecWrappersTest("rootfs",
-        -1, EISDIR,
-        0, NULL, 0,
+        -1, EISDIR, -1, EISDIR,
+        0, NULL, 0, NULL, 0,
         "../../", TERMUX__ROOTFS, environ,
         NULL);
 }
@@ -358,35 +359,69 @@ void test__execIntercept__Files(const char* termuxExec_tests_testsPath, const ch
 
     char* testFilePath = NULL;
 
-    asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-binary");
-    runAllExecWrappersTest("print-args-binary",
-        0, 0,
-        0, "^goodbye-world$", REG_EXTENDED,
-        "print-args-binary", testFilePath, environ,
-        "goodbye-world", NULL);
-    free(testFilePath);
+    int expectedReturnValue = 0;
+    int expectedErrno = 0;
+    int expectedReturnValueP = 0;
+    int expectedErrnoP = 0;
 
-    asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-binary.sym");
-    runAllExecWrappersTest("print-args-binary.sym",
-        0, 0,
-        0, "^goodbye-world$", REG_EXTENDED,
-        "print-args-binary.sym", testFilePath, environ,
-        "goodbye-world", NULL);
-    free(testFilePath);
+    int expectedExitCode = 0;
+    char* expectedOutputRegex = "^goodbye-world$";
+    int expectedExitCodeP = 0;
+    char* expectedOutputRegexP = "^goodbye-world$";
+
+
+    // If `argv[0]` length is `>= 128` on Android `< 6`, then commands
+    // would normally fail with exit code 1 without any error on stderr,
+    // but `termux-exec` will prevent this by returning `-1` from
+    // `execveIntercept()` with `ENAMETOOLONG` errno.
+    // Check `checkExecArg0BufferOverflow()` function in `ExecIntercept.h`.
+    if (android_buildVersionSdk_get() < 23) {
+        asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-binary");
+        runAllExecWrappersTest("print-args-binary",
+            -1, ENAMETOOLONG, expectedReturnValueP, expectedErrnoP,
+            0, "^$", expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
+            "print-args-binary", testFilePath, environ,
+            "goodbye-world", NULL);
+        free(testFilePath);
+
+        asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-binary.sym");
+        runAllExecWrappersTest("print-args-binary.sym",
+            -1, ENAMETOOLONG, expectedReturnValueP, expectedErrnoP,
+            0, "^$", expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
+            "print-args-binary.sym", testFilePath, environ,
+            "goodbye-world", NULL);
+        free(testFilePath);
+    } else {
+        asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-binary");
+        runAllExecWrappersTest("print-args-binary",
+            expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,
+            expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
+            "print-args-binary", testFilePath, environ,
+            "goodbye-world", NULL);
+        free(testFilePath);
+
+        asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-binary.sym");
+        runAllExecWrappersTest("print-args-binary.sym",
+            expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,
+            expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
+            "print-args-binary.sym", testFilePath, environ,
+            "goodbye-world", NULL);
+        free(testFilePath);
+    }
 
 
     asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-linux-script.sh");
     runAllExecWrappersTest("print-args-linux-script.sh",
-        0, 0,
-        0, "^goodbye-world$", REG_EXTENDED,
+        expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,
+        expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
         "print-args-linux-script.sh", testFilePath, environ,
         "goodbye-world", NULL);
     free(testFilePath);
 
     asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-linux-script.sh.sym");
     runAllExecWrappersTest("print-args-linux-script.sh.sym",
-        0, 0,
-        0, "^goodbye-world$", REG_EXTENDED,
+        expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,
+        expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
         "print-args-linux-script.sh.sym", testFilePath, environ,
         "goodbye-world", NULL);
     free(testFilePath);
@@ -394,16 +429,16 @@ void test__execIntercept__Files(const char* termuxExec_tests_testsPath, const ch
 
     asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-termux-script.sh");
     runAllExecWrappersTest("print-args-termux-script.sh",
-        0, 0,
-        0, "^goodbye-world$", REG_EXTENDED,
+        expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,
+        expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
         "print-args-termux-script.sh", testFilePath, environ,
         "goodbye-world", NULL);
     free(testFilePath);
 
     asprintf_wrapper(&testFilePath, "%s/%s", termuxExec__execTestFilesPath, "print-args-termux-script.sh.sym");
     runAllExecWrappersTest("print-args-termux-script.sh.sym",
-        0, 0,
-        0, "^goodbye-world$", REG_EXTENDED,
+        expectedReturnValue, expectedErrno, expectedReturnValueP, expectedErrnoP,
+        expectedExitCode, expectedOutputRegex, expectedExitCodeP, expectedOutputRegexP, REG_EXTENDED,
         "print-args-termux-script.sh.sym", testFilePath, environ,
         "goodbye-world", NULL);
     free(testFilePath);
@@ -456,8 +491,8 @@ void test__execIntercept__PackageManager() {
     }
 
     runAllExecWrappersTest("package-manager-version",
-        0, 0,
-        0, termuxPackageManagerVersionRegex, REG_EXTENDED | REG_ICASE,
+        0, 0, 0, 0,
+        0, termuxPackageManagerVersionRegex, 0, termuxPackageManagerVersionRegex, REG_EXTENDED | REG_ICASE,
         termuxPackageManager, termuxPackageManagerPath, environ,
         "--version", NULL);
 

@@ -55,6 +55,65 @@ extern "C" {
  * - https://github.com/bminor/bash/blob/bash-5.2/execute_cmd.c#L5964
  * - https://github.com/bminor/bash/blob/bash-5.2/execute_cmd.c#L5988
  * - https://github.com/bminor/bash/blob/bash-5.2/execute_cmd.c#L6048
+ *
+ *
+ *
+ * For Android `< 6`, the length must not be `>= 128` for the `argv[0]`
+ * string of an `execve()` call or library path of a `dlopen()` call.
+ *
+ * The `soinfo_alloc()` function in `linker.cpp` of Android `/system/bin/linker*`
+ * that loaded the `soinfo` of a library/executable had a `SOINFO_NAME_LEN=128`
+ * limit on the path/name passed to it before aae859cc, after which it
+ * was increased to `PATH_MAX`. Earlier, if path passed was `>= 128`,
+ * then `library name "<library_name>" too long` error would occur.
+ *
+ * Before dcaef371, the `__linker_init_post_relocation()` function also
+ * passed `argv[0]` as executable path to `soinfo_alloc()` function to
+ * load its `soinfo`, instead of the actual absolute path of the
+ * executable. So before aae859cc, if either length was `>= 128`, then
+ * the process would abort with exit code `1`. Note that the `execve()`
+ * call itself will not fail, failure occurs before `main()` is called.
+ * The limit also applies to the interpreter defined in scripts, as
+ * interpreter is passed as `argv[0]` during execution.
+ *
+ * Both fixes are only available in Android `>= 6`. For earlier
+ * versions like Android 5, the path for executables and libraries
+ * must be kept below the limit. However, for executables, to allow
+ * execution, the `argv[0]` can be shortened even if executable path
+ * is longer, or by first changing current working directory to
+ * executable's parent directory and then executing it with a relative
+ * path.
+ *
+ * ```
+ * LD_DEBUG=3 /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-binary arg1; echo $?
+ * 1
+ *
+ * # Logcat
+ * linker W  [ android linker & debugger ]
+ * linker D  DEBUG: library name "/data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-binary" too long
+ * ```
+ *
+ * ```
+ * (exec -a print-args-binary /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-binary arg1); echo $?
+ * arg1
+ * 0
+ * ```
+ *
+ * ```
+ * (cd /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files && ./print-args-binary arg1); echo $?
+ * arg1
+ * 0
+ * ```
+ *
+ * - https://cs.android.com/android/_/android/platform/bionic/+/dcaef371
+ * - https://cs.android.com/android/_/android/platform/bionic/+/aae859cc
+ * - https://github.com/termux/termux-app/issues/213
+ *
+ * See also `TERMUX__PREFIX__BIN_FILE___SAFE_MAX_LEN` in
+ * https://github.com/termux/termux-core-package/blob/master/lib/termux-core_nos_c_tre/include/termux/termux_core__nos__c/v1/termux/file/TermuxFile.h
+ *
+ * **See Also:**
+ * - https://github.com/termux/termux-packages/wiki/Termux-file-system-layout#file-path-limits
  */
 
 /**
@@ -275,6 +334,31 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     bool interpreterSet, bool shouldEnableSystemLinkerExec, struct TermuxFileHeaderInfo *info);
 
 
+
+/**
+ * Check if `argv[0]` length is `>= 128` on Android `< 6` as commands
+ * will fail with exit code 1 without any error on stderr,
+ * but with the `library name "<library_name>" too long` error in
+ * `logcat` if linker debugging is enabled.
+ *
+ * See comment at top of this file.
+ *
+ * @param argv The current arguments pointer.
+ * @param origExecutablePath The originnal executable path passed to
+ *                             `execve()`.
+ * @param executablePath The **normalized** executable or interpreter
+ *                        path that will actually be executed.
+ * @param processedExecutablePath The **normalized** executable path
+ *                        that was passed to `execve()`.
+ * @param interpreterSet Whether a interpreter is set in the executable
+ *                       file.
+ * @return Returns `0` `argv[0]` length is `< 128` or running on
+ * Android `>= 6`, otherwise `-1` with errno set to `ENAMETOOLONG` if
+ * buffer overflow would occur..
+ */
+int checkExecArg0BufferOverflow(char *const *argv,
+    const char *executablePath, const char *processedExecutablePath,
+    bool interpreterSet);
 
 #ifdef __cplusplus
 }

@@ -70,11 +70,16 @@ libtermux_exec__nos__c__unit_binary_tests__run_command() {
     termux_exec__tests__log 1 "Running 'libtermux-exec_nos_c_tre_${unit_binary_tests_variant}'"
 
     output="$(
+        # cd first and execute with relative path to shorten `argv[0]`,
+        # otherwise command will fail with exit code `1` on Android `< 6`
+        # without any error if `argv[0]` length is `>= 128`.
+        # Check `checkExecArg0BufferOverflow()` function in `ExecIntercept.h`.
+        cd "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c_tre/bin" || exit $?
         printf -v "$TERMUX_EXEC__TESTS__LOG_LEVEL___N" "%s" "$TERMUX_EXEC__TESTS__LOG_LEVEL" || exit $?
         export "${TERMUX_EXEC__TESTS__LOG_LEVEL___N?}" || exit $?
         export LD_PRELOAD="$TERMUX_EXEC__TESTS__PRIMARY_LD_PRELOAD_FILE_PATH" || exit $?
         ASAN_OPTIONS="fast_unwind_on_malloc=false:detect_leaks=$TERMUX_EXEC__TESTS__DETECT_LEAKS" LSAN_OPTIONS="report_objects=$TERMUX_EXEC__TESTS__DETECT_LEAKS" \
-            "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c_tre/bin/libtermux-exec_nos_c_tre_${unit_binary_tests_variant}" 2>&1)"
+            "./libtermux-exec_nos_c_tre_${unit_binary_tests_variant}" 2>&1)"
     return_value=$?
     if [ $return_value -eq 0 ] ||
         { [ $return_value -eq 141 ] &&
@@ -144,10 +149,15 @@ libtermux_exec__nos__c__runtime_binary_tests__run_command() {
 
     termux_exec__tests__log 1 "Running 'libtermux-exec_nos_c_tre_${runtime_binary_tests_variant}'"
     (
+        # cd first and execute with relative path to shorten `argv[0]`,
+        # otherwise command will fail with exit code `1` on Android `< 6`
+        # without any error if `argv[0]` length is `>= 128`.
+        # Check `checkExecArg0BufferOverflow()` function in `ExecIntercept.h`.
+        cd "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c_tre/bin" || exit $?
         printf -v "$TERMUX_EXEC__TESTS__LOG_LEVEL___N" "%s" "$TERMUX_EXEC__TESTS__LOG_LEVEL" || exit $?
         export "${TERMUX_EXEC__TESTS__LOG_LEVEL___N?}" || exit $?
         ASAN_OPTIONS="fast_unwind_on_malloc=false:detect_leaks=$TERMUX_EXEC__TESTS__DETECT_LEAKS" LSAN_OPTIONS="report_objects=$TERMUX_EXEC__TESTS__DETECT_LEAKS" \
-            "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c_tre/bin/libtermux-exec_nos_c_tre_${runtime_binary_tests_variant}"
+            "./libtermux-exec_nos_c_tre_${runtime_binary_tests_variant}"
     )
     return_value=$?
     if [ $return_value -ne 0 ]; then

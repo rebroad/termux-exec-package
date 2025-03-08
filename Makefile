@@ -201,6 +201,11 @@ override LIBTERMUX_EXEC__NOS__C__CPPFLAGS := \
 override LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR := $(TESTS_BUILD_OUTPUT_DIR)/lib/termux-exec_nos_c_tre
 
 
+ifneq ($(LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW),1)
+	override LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW := 0
+endif
+
+
 
 override TERMUX_EXEC__MAIN_APP__TESTS_BUILD_OUTPUT_DIR := $(TESTS_BUILD_OUTPUT_DIR)/app/main
 
@@ -284,6 +289,7 @@ build-libtermux-exec_nos_c_tre:
 		mkdir -p "$$(dirname "$(TMP_BUILD_OUTPUT_DIR)/$$source_file")" || exit $$?; \
 		$(CC) -c $(CFLAGS) $(LIBTERMUX_EXEC__NOS__C__CPPFLAGS) \
 			$(TERMUX__CONSTANTS__MACRO_FLAGS) \
+			-DLIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW=$(LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW) \
 			-fPIC -fvisibility=default \
 			-o $(TMP_BUILD_OUTPUT_DIR)/"$$(echo "$$source_file" | sed -E "s/(.*)\.c$$/\1.o/")" \
 			"$$source_file" || exit $$?; \
