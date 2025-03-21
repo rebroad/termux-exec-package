@@ -246,6 +246,9 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
  * `TermuxFileHeaderInfo.origInterpreterPath`, otherwise the original
  * `argv[0]` passed to `execve()` will be preserved.
  *
+ * If `shouldEnableSystemLinkerExec` is `true`, then `argv[1]` will be
+ * set to `executablePath` to be executed by the linker.
+ *
  * If `interpreterSet` is set, then `TermuxFileHeaderInfo.interpreterArg`
  * will be appended if set, followed by the `origExecutablePath`
  * passed to `execve()`.
@@ -261,13 +264,15 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
  * @param interpreterSet Whether a interpreter is set in the executable
  *                        file.
  * @param info The `TermuxFileHeaderInfo` for the executable file.
+ * @param shouldEnableSystemLinkerExec Whether `system_linker_exec`
+ * should be used to execute the path.
  * @return Returns `0` if successfully modified the args, otherwise
  * `-1` on failures. Its the callers responsibility to call `free()`
  * on the `newArgvPointer` passed.
  */
 int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     const char *origExecutablePath, const char *executablePath,
-    bool interpreterSet, struct TermuxFileHeaderInfo *info);
+    bool interpreterSet, bool shouldEnableSystemLinkerExec, struct TermuxFileHeaderInfo *info);
 
 
 

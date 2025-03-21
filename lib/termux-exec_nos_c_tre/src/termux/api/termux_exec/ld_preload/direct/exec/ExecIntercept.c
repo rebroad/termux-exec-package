@@ -20,6 +20,7 @@
 #include <termux/termux_core__nos__c/v1/unix/file/UnixFileUtils.h>
 
 #include <termux/termux_exec__nos__c/v1/TermuxExecLibraryConfig.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/TermuxExecLDPreload.h>
 #include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecIntercept.h>
 #include <termux/termux_exec__nos__c/v1/termux/shell/command/environment/termux_exec/TermuxExecShellEnvironment.h>
 
@@ -211,12 +212,45 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
 
+
+    // Check if `system_linker_exec` is required.
+    int shouldEnableSystemLinkerExecResult = shouldEnableSystemLinkerExecForFile(executablePath);
+    if (shouldEnableSystemLinkerExecResult < 0) {
+        return -1;
+    }
+    bool shouldEnableSystemLinkerExec = shouldEnableSystemLinkerExecResult == 0 ? true : false;
+
+
+
     bool modifyEnv = false;
     bool unsetLdVarsFromEnv = shouldUnsetLDVarsFromEnv(info.isNonNativeElf, executablePath);
     logErrorVVerbose(LOG_TAG, "unset_ld_vars_from_env: '%d'", unsetLdVarsFromEnv);
 
     if (unsetLdVarsFromEnv && areVarsInEnv(envp, LD_VARS_TO_UNSET, LD_VARS_TO_UNSET_SIZE)) {
         modifyEnv = true;
+    }
+
+
+
+    // If `system_linker_exec` is going to be used, then set `TERMUX_EXEC__PROC_SELF_EXE`
+    // environment variable to `processedExecutablePath`, otherwise
+    // unset it if it is already set.
+    char *envTermuxProcSelfExe = NULL;
+    if (shouldEnableSystemLinkerExec) {
+        modifyEnv = true;
+        logErrorVVerbose(LOG_TAG, "set_proc_self_exe_var_in_env: '%d'", true);
+
+        if (asprintf(&envTermuxProcSelfExe, "%s%s", ENV_PREFIX__TERMUX_EXEC__PROC_SELF_EXE, processedExecutablePath) == -1) {
+            errno = ENOMEM;
+            logStrerrorDebug(LOG_TAG, "asprintf failed for '%s%s'", ENV_PREFIX__TERMUX_EXEC__PROC_SELF_EXE, processedExecutablePath);
+            return -1;
+        }
+    } else {
+        const char *proc_self_exe_var[] = { ENV_PREFIX__TERMUX_EXEC__PROC_SELF_EXE };
+        if (areVarsInEnv(envp, proc_self_exe_var, 1)) {
+            logErrorVVerbose(LOG_TAG, "unset_proc_self_exe_var_from_env: '%d'", true);
+            modifyEnv = true;
+        }
     }
 
     logErrorVVerbose(LOG_TAG, "modify_env: '%d'", modifyEnv);
@@ -237,18 +271,23 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
 
-    const bool modifyArgs = interpreterSet;
+    const bool modifyArgs = shouldEnableSystemLinkerExec || interpreterSet;
     logErrorVVerbose(LOG_TAG, "modify_args: '%d'", modifyArgs);
 
     const char **newArgv = NULL;
     if (modifyArgs) {
         if (modifyExecArgs(argv, &newArgv, origExecutablePath, executablePath,
-            interpreterSet, &info) != 0 ||
+            interpreterSet, shouldEnableSystemLinkerExec, &info) != 0 ||
             newArgv == NULL) {
             logErrorDebug(LOG_TAG, "Failed to create modified exec args");
             free(envTermuxProcSelfExe);
             free(newEnvp);
             return -1;
+        }
+
+        // Replace executable path if wrapping with linker.
+        if (shouldEnableSystemLinkerExec) {
+            executablePath = SYSTEM_LINKER_PATH;
         }
 
         argv = (char **) newArgv;
@@ -383,7 +422,6 @@ int inspectFileHeader(const char *termuxPrefixDir, char *header, size_t headerLe
 
 
     bool verboseLoggingEnabled = getCurrentLogLevel() >= LOG_LEVEL__VERBOSE;
-    (void)verboseLoggingEnabled;
     size_t interpreterPathBufferSize = sizeof(info->interpreterPathBuffer);
 
     char interpreterPathBuffer[strlen(interpreter) + 1];
@@ -568,7 +606,7 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
 
 int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     const char *origExecutablePath, const char *executablePath,
-    bool interpreterSet, struct TermuxFileHeaderInfo *info) {
+    bool interpreterSet, bool shouldEnableSystemLinkerExec, struct TermuxFileHeaderInfo *info) {
     int argsCount = 0;
     while (argv[argsCount] != NULL) {
         argsCount++;
@@ -592,6 +630,11 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     } else {
         // Preserver original `argv[0]` to `execve()`.
         newArgv[index++] = argv[0];
+    }
+
+    // Add executable path if wrapping with linker.
+    if (shouldEnableSystemLinkerExec) {
+        newArgv[index++] = executablePath;
     }
 
     // Add interpreter argument and script path if executing a script with shebang.

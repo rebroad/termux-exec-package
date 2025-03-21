@@ -30,3 +30,18 @@ int termuxExec_execveCall_intercept_get() {
     }
     return def;
 }
+
+int termuxExec_systemLinkerExec_mode_get() {
+    int def = ENV_DEF_VAL__TERMUX_EXEC__SYSTEM_LINKER_EXEC__MODE;
+    const char* value = getenv(ENV__TERMUX_EXEC__SYSTEM_LINKER_EXEC__MODE);
+    if (value == NULL || strlen(value) < 1) {
+        return def;
+    } else if (strcmp(value, "disable") == 0) {
+        return 0;
+    } else if (strcmp(value, "enable") == 0) {
+        return 1;
+    } else if (strcmp(value, "force") == 0) {
+        return 2;
+    }
+    return def;
+}

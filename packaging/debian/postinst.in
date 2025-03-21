@@ -1,0 +1,21 @@
+#!@TERMUX__PREFIX@/bin/sh
+# shellcheck shell=sh
+# shellcheck disable=SC2039,SC2059,SC3043
+
+log() { echo "termux-exec.postinst:" "$@"; }
+log_error() { echo "termux-exec.postinst:" "$@" 1>&2; }
+
+##
+# `main` [`<argument...>`]
+##
+main() {
+
+    log "Start"
+
+    termux-exec-ld-preload-lib setup -v || return $?
+
+    log "End"
+
+}
+
+main "$@"

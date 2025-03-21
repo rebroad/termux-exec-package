@@ -63,6 +63,7 @@ export override BUILD_OUTPUT_DIR := $(BUILD_DIR)/output# Default value: `build/o
 export override TMP_BUILD_OUTPUT_DIR := $(BUILD_OUTPUT_DIR)/tmp# Default value: `build/output/tmp`
 
 export override PREFIX_BUILD_OUTPUT_DIR := $(BUILD_OUTPUT_DIR)/usr# Default value: `build/output/usr`
+export override BIN_BUILD_OUTPUT_DIR := $(PREFIX_BUILD_OUTPUT_DIR)/bin# Default value: `build/output/usr/bin`
 export override LIB_BUILD_OUTPUT_DIR := $(PREFIX_BUILD_OUTPUT_DIR)/lib# Default value: `build/output/usr/lib`
 export override LIBEXEC_BUILD_OUTPUT_DIR := $(PREFIX_BUILD_OUTPUT_DIR)/libexec# Default value: `build/output/usr/libexec`
 export override TESTS_BUILD_OUTPUT_DIR := $(LIBEXEC_BUILD_OUTPUT_DIR)/installed-tests/termux-exec# Default value: `build/output/usr/libexec/installed-tests/termux-exec`
@@ -236,7 +237,7 @@ CLANG_TIDY ?= clang-tidy
 # - https://www.gnu.org/software/make/manual/html_node/Parallel-Disable.html
 .NOTPARALLEL:
 
-all: | pre-build build-libtermux-exec_nos_c_tre build-libtermux-exec-direct-ld-preload build-termux-exec-main-app
+all: | pre-build build-libtermux-exec_nos_c_tre build-libtermux-exec-direct-ld-preload build-libtermux-exec-linker-ld-preload build-termux-exec-main-app
 	@printf "\ntermux-exec-package: %s\n" "Building packaging/debian/*"
 	@mkdir -p $(DEBIAN_PACKAGING_BUILD_OUTPUT_DIR)
 	find packaging/debian -mindepth 1 -maxdepth 1 -type f -name "*.in" -exec sh -c \
@@ -258,6 +259,15 @@ pre-build: | clean
 
 build-termux-exec-main-app:
 	@printf "\ntermux-exec-package: %s\n" "Building app/main"
+	@mkdir -p $(BIN_BUILD_OUTPUT_DIR)
+
+
+	@printf "\ntermux-exec-package: %s\n" "Building app/main/scripts/*"
+	find app/main/scripts -type f -name "*.in" -exec sh -c \
+		'sed $(TERMUX__CONSTANTS__SED_ARGS) "$$1" > $(BIN_BUILD_OUTPUT_DIR)/"$$(basename "$$1" | sed "s/\.in$$//")"' sh "{}" \;
+	find $(BIN_BUILD_OUTPUT_DIR) -maxdepth 1 -exec chmod 700 "{}" \;
+	find app/main/scripts -type l -exec cp -a "{}" $(BIN_BUILD_OUTPUT_DIR)/ \;
+
 
 build-libtermux-exec_nos_c_tre:
 	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre"
@@ -307,6 +317,10 @@ build-libtermux-exec-direct-ld-preload:
 	@# primary library variant exported in `$LD_PRELOAD` by copying it
 	@# to `libtermux-exec-ld-preload.so`.
 	@# Creating a symlink may have performance impacts.
+	@# The `postinst` script run during package installation runs
+	@# `termux-exec-ld-preload-lib setup` to set the correct variant
+	@# as per the execution type required for the Termux environment
+	@# of the host device by running.
 	cp -a $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-direct-ld-preload.so $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-ld-preload.so
 
 	@# For backward compatibility, symlink `libtermux-exec.so` to
@@ -317,6 +331,24 @@ build-libtermux-exec-direct-ld-preload:
 	rm -f $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec.so
 	ln -s libtermux-exec-ld-preload.so $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec.so
 
+build-libtermux-exec-linker-ld-preload:
+	@mkdir -p $(LIB_BUILD_OUTPUT_DIR)
+
+	@# Unlike `libtermux-exec_nos_c_tre.so` and `libtermux-exec_nos_c_tre.a`, all
+	@# symbols are hidden, except the exported functions with
+	@# `default` visibility with `__attribute__((visibility("default")))`,
+	@# defined in the `TermuxExecLinkerLDPreloadEntryPoint.c` file meant to
+	@# be intercepted by `$LD_PRELOAD`.
+	@# `nm --demangle --dynamic --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/lib/libtermux-exec-linker-ld-preload.so`
+	@printf "\ntermux-exec-package: %s\n" "Building lib/libtermux-exec-linker-ld-preload"
+	$(CC) $(CFLAGS) $(LIBTERMUX_EXEC__NOS__C__CPPFLAGS) \
+		-L$(LIB_BUILD_OUTPUT_DIR) $(LDFLAGS) -Wl,--exclude-libs=ALL \
+		$(TERMUX__CONSTANTS__MACRO_FLAGS) \
+		-fPIC -shared -fvisibility=hidden \
+		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-linker-ld-preload.so \
+		app/termux-exec-linker-ld-preload/src/termux/api/termux_exec/ld_preload/linker/TermuxExecLinkerLDPreloadEntryPoint.c \
+		-l:libtermux-exec_nos_c_tre.a -l:libtermux-core_nos_c_tre.a
+
 
 
 clean:
@@ -324,10 +356,13 @@ clean:
 
 install:
 	@printf "termux-exec-package: %s\n" "Installing termux-exec-package in $(TERMUX_EXEC_PKG__INSTALL_PREFIX)"
+	install -d $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/bin
 	install -d $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include
 	install -d $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib
 	install -d $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/libexec
 
+
+	find $(BIN_BUILD_OUTPUT_DIR) -maxdepth 1 \( -type f -o -type l \) -exec cp -a "{}" $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/bin/ \;
 
 	rm -rf $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec
 	install -d $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec/termux
@@ -338,6 +373,7 @@ install:
 
 	install $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-ld-preload.so $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec-ld-preload.so
 	install $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-direct-ld-preload.so $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec-direct-ld-preload.so
+	install $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-linker-ld-preload.so $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec-linker-ld-preload.so
 	@# Use `cp` for symlink as `install` will copy the target regular file instead.
 	cp -a $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec.so $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec.so
 
@@ -350,6 +386,9 @@ install:
 uninstall:
 	@printf "termux-exec-package: %s\n" "Uninstalling termux-exec-package from $(TERMUX_EXEC_PKG__INSTALL_PREFIX)"
 
+	find app/main/scripts \( -type f -o -type l \) -exec sh -c \
+		'rm -f $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/bin/"$$(basename "$$1" | sed "s/\.in$$//")"' sh "{}" \;
+
 	rm -rf $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec
 
 
@@ -358,6 +397,7 @@ uninstall:
 
 	rm -f $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec-ld-preload.so
 	rm -f $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec-direct-ld-preload.so
+	rm -f $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec-linker-ld-preload.so
 	rm -f $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec.so
 
 	@printf "\ntermux-exec-package: %s\n\n" "Uninstall termux-exec-package successful"
@@ -382,4 +422,4 @@ check:
 
 
 
-.PHONY: all pre-build build-termux-exec-main-app build-libtermux-exec_nos_c_tre build-libtermux-exec-direct-ld-preload clean install uninstall packaging-debian-build format check
+.PHONY: all pre-build build-termux-exec-main-app build-libtermux-exec_nos_c_tre build-libtermux-exec-direct-ld-preload build-libtermux-exec-linker-ld-preload clean install uninstall packaging-debian-build format check
