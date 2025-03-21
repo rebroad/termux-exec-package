@@ -45,3 +45,9 @@ int termuxExec_systemLinkerExec_mode_get() {
     }
     return def;
 }
+
+
+
+int termuxExec_tests_logLevel_get() {
+    return getLogLevelFromEnv(ENV__TERMUX_EXEC__TESTS__LOG_LEVEL);
+}
