@@ -1,0 +1,20 @@
+{
+    "control": {
+        "Package": "termux-exec",
+        "Version": "@TERMUX_EXEC_PKG__VERSION@",
+        "Architecture": "@TERMUX_EXEC_PKG__ARCH@",
+        "Maintainer": "@termux",
+        "Homepage": "https://github.com/termux/termux-exec-package",
+        "Description": "Utils and libraries for Termux exec including a LD_PRELOAD shared library for proper functioning of the Termux execution environment"
+    },
+
+    "installation_prefix": "@TERMUX__PREFIX@",
+    "control_files_dir": "build/output/packaging/debian",
+
+    "data_files": {
+        "": {
+            "source": "build/output/usr",
+            "source_recurse": true
+        }
+    }
+}
