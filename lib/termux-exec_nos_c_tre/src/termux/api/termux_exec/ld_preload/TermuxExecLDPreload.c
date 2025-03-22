@@ -111,6 +111,11 @@ int isSystemLinkerExecEnabled() {
                 if (getSeProcessContextSuccess) {
                     appDataFileExecExempted = stringStartsWith(seProcessContext, PROCESS_CONTEXT_PREFIX__UNTRUSTED_APP_25) ||
                         stringStartsWith(seProcessContext, PROCESS_CONTEXT_PREFIX__UNTRUSTED_APP_27);
+                } else {
+                    // If even '/proc/self/attr/current' is not accessible,
+                    // then SeLinux may not be supported on the device.
+                    logErrorVVerbose(LOG_TAG, "se_process_context_available: '0'");
+                    appDataFileExecExempted = true;
                 }
             }
 
