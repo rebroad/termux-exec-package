@@ -6,7 +6,7 @@ page_ref: "@ARK_PROJECT__VARIANT@/termux/termux-exec-package/releases/index.html
 
 This page lists the releases info for [`termux-exec-package`](https://github.com/termux/termux-exec-package).
 
-**The currently latest release of `termux-exec` is [`v1.0`](1/v1.0.md).**
+**The currently latest release of `termux-exec` is [`v2.1.0`](2/v2.1.0.md).**
 
 ---
 
@@ -53,6 +53,7 @@ Open a release to view its release notes and/or changelogs. Changelogs are gener
 ### `v2`
 
 - [`v2.0.0`](2/v2.0.0.md)
+- [`v2.1.0`](2/v2.1.0.md)
 
 ---
 
