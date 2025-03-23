@@ -80,8 +80,6 @@ termux_exec__system_linker_exec__main() {
 ##
 termux_exec__system_linker_exec__enabled__run_command() {
 
-    local return_value
-
     local output_variable_name="${1:-}"
 
     termux_exec__system_linker_exec__set_variable "$output_variable_name" "" || return $?
@@ -129,28 +127,26 @@ termux_exec__system_linker_exec__enabled__run_command() {
         # If running on Android `>= 10`.
         if [ "$android_build_version_sdk" -ge 29 ]; then
             local app_data_file_exec_exempted="false"
-            if [ -f "/proc/self/attr/current" ] && [ -r "/proc/self/attr/current" ]; then
-                local se_process_context
-
-                return_value=0
-                se_process_context="$(cat "/proc/self/attr/current")" || return_value=$?
-                if [ "$return_value" -ne 0 ] || [ -z "$se_process_context" ]; then
-                    termux_exec__system_linker_exec__log_error "Failed to get se_process_context value from '/proc/self/attr/current': '$se_process_context'"
-                    return 1
-                fi
-
+            # If '/proc/self/attr/current' is not readable,
+            # then SeLinux may not be supported on the device.
+            # Reading the file with `cat` may fail with `Illegal argument`
+            # error on such devices, even though `test -f` and `test -r`
+            # commands for the `access()` call succeed.
+            # `cat: /proc/self/attr/current: Illegal argument`
+            # - https://github.com/termux/termux-exec-package/issues/30
+            local se_process_context
+            se_process_context="$(cat "/proc/self/attr/current")" || true
+            if [ -z "$se_process_context" ]; then
+                termux_exec__system_linker_exec__log_error "Failed to read se_process_context value from '/proc/self/attr/current': '$se_process_context'"
+                termux_exec__system_linker_exec__log_error_for_level 2 "se_process_context_available: 'false'"
+                app_data_file_exec_exempted="true"
+            else
+                termux_exec__system_linker_exec__log_error_for_level 2 "se_process_context_from_file: '$se_process_context'"
                 case "$se_process_context" in
                     "u:r:untrusted_app_25:"*|"u:r:untrusted_app_27:"*)
                         app_data_file_exec_exempted="true"
                         ;;
                 esac
-                termux_exec__system_linker_exec__log_error_for_level 2 "se_process_context_from_file: '$se_process_context'"
-            else
-                # If '/proc/self/attr/current' is not accessible,
-                # then SeLinux may not be supported on the device.
-                termux_exec__system_linker_exec__log_error_for_level 2 "Failed to find or read '/proc/self/attr/current' to read se_process_context value"
-                termux_exec__system_linker_exec__log_error_for_level 2 "se_process_context_available: 'false'"
-                app_data_file_exec_exempted="true"
             fi
 
             termux_exec__system_linker_exec__log_error_for_level 2 "app_data_file_exec_exempted: '$app_data_file_exec_exempted'"
