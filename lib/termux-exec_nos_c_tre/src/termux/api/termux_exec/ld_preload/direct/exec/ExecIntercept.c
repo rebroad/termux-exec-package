@@ -183,30 +183,61 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
 
-    char header[TERMUX__FILE_HEADER__BUFFER_SIZE];
-    ssize_t headerLength = readFileHeader("executable", executablePath, header, sizeof(header));
-    if (headerLength < 0) {
-        return headerLength;
-    }
-
-
+    // NOTE: `TermuxFileHeaderInfo.isElf` state will only be valid if
+    // header was successfully read and inspected.
     struct TermuxFileHeaderInfo info = {
         .interpreterPath = NULL,
         .interpreterArg = NULL,
     };
 
-    if (inspectFileHeader(NULL, header, headerLength, &info) != 0) {
-        return -1;
+    char header[TERMUX__FILE_HEADER__BUFFER_SIZE];
+    bool shouldEnableInterpreterExec = false;
+
+    ssize_t headerLength = -1;
+    // Only read file header if executable is not a system executable,
+    // like under `/system` or `/vendor` partitions, etc, as even though
+    // `access(X_OK)` call may succeed, but `open()` call may fail
+    // with `No such file or directory (ENOENT)` on some devices.
+    // For such files, `fexecve()` should not be possible either.
+    // - `/system/bin/su` if using `KernelSU`.
+    //     - https://github.com/termux/termux-exec-package/issues/31
+    // - `/system/bin/*` utilities provided by `toybox`/`toolbox`,
+    //   like `ls` or `getprop` on Samsung devices (S25*).
+    //     - https://github.com/termux/termux-app/issues/4448
+    //     - https://github.com/termux/termux-exec-package/issues/32
+    // - `/system/bin/app_process`.
+    //     - https://github.com/termux/termux-app/issues/4440#issuecomment-2746002438
+    if (isSystemExecutable(executablePath)) {
+        logErrorVVerbose(LOG_TAG, "read_file_header: '0'");
+    } else {
+        logErrorVVerbose(LOG_TAG, "read_file_header: '1'");
+        headerLength = readFileHeader("executable", executablePath, header, sizeof(header));
+        // Do not continue for errors other than
+        // `No such file or directory (ENOENT)`,
+        // like `Is a directory (EISDIR)`.
+        if (headerLength < 0 && errno != ENOENT) {
+            return headerLength;
+        }
     }
 
-    bool interpreterSet = info.interpreterPath != NULL;
-    if (!info.isElf && !interpreterSet) {
-        errno = ENOEXEC;
-        logStrerrorDebug(LOG_TAG, "Not an ELF or no shebang in executable path '%s'", processedExecutablePath);
-        return -1;
+    // If executable is not a system executable or failed to read header.
+    if (headerLength < 0) {
+        errno = 0;
+    } else {
+        if (inspectFileHeader(NULL, header, headerLength, &info) != 0) {
+            return -1;
+        }
+
+        if (!info.isElf && info.interpreterPath == NULL) {
+            errno = ENOEXEC;
+            logStrerrorDebug(LOG_TAG, "Not an ELF or no shebang in executable path '%s'", processedExecutablePath);
+            return -1;
+        }
+
+        shouldEnableInterpreterExec = info.interpreterPath != NULL;
     }
 
-    if (interpreterSet) {
+    if (shouldEnableInterpreterExec) {
         executablePath = info.interpreterPath;
     }
 
@@ -271,13 +302,13 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
 
-    const bool modifyArgs = shouldEnableSystemLinkerExec || interpreterSet;
+    const bool modifyArgs = shouldEnableInterpreterExec || shouldEnableSystemLinkerExec;
     logErrorVVerbose(LOG_TAG, "modify_args: '%d'", modifyArgs);
 
     const char **newArgv = NULL;
     if (modifyArgs) {
         if (modifyExecArgs(argv, &newArgv, origExecutablePath, executablePath,
-            interpreterSet, shouldEnableSystemLinkerExec, &info) != 0 ||
+            shouldEnableInterpreterExec, shouldEnableSystemLinkerExec, &info) != 0 ||
             newArgv == NULL) {
             logErrorDebug(LOG_TAG, "Failed to create modified exec args");
             free(envTermuxProcSelfExe);
@@ -296,7 +327,8 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
     #if defined LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW && LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW == 1
-    if (checkExecArg0BufferOverflow(argv, executablePath, processedExecutablePath, interpreterSet) != 0) {
+    if (checkExecArg0BufferOverflow(argv, executablePath, processedExecutablePath,
+            shouldEnableInterpreterExec) != 0) {
         return -1;
     }
     #endif
@@ -328,11 +360,12 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 int readFileHeader(const char *label, const char *executablePath,
     char *buffer, size_t bufferSize) {
+    // This may fail, check comment in `execveInterceptInternal()`
+    // for the `readFileHeader()` call for more info.
     // - https://man7.org/linux/man-pages/man2/open.2.html
     int fd = open(executablePath, O_RDONLY);
     if (fd == -1) {
-        errno = ENOENT;
-        logStrerrorDebug(LOG_TAG, "Failed to open %s path '%s'", label, executablePath);
+        logStrerrorDebug(LOG_TAG, "Failed to open %s path '%s' for file header", label, executablePath);
         return -1;
     }
 
@@ -341,7 +374,7 @@ int readFileHeader(const char *label, const char *executablePath,
     // Ensure read was successful, path could be a directory and EISDIR will be returned.
     // - https://man7.org/linux/man-pages/man2/read.2.html
     if (headerLength < 0) {
-        logStrerrorDebug(LOG_TAG, "Failed to read %s path '%s'", label, executablePath);
+        logStrerrorDebug(LOG_TAG, "Failed to read %s path '%s' for file header", label, executablePath);
         return -1;
     }
     close(fd);
@@ -529,6 +562,23 @@ bool isElfFile(char *header, size_t headerLength) {
 
 
 
+bool isSystemExecutable(const char *executablePath) {
+    if (
+        stringStartsWith(executablePath, "/apex/") ||
+        stringStartsWith(executablePath, "/odm/") ||
+        stringStartsWith(executablePath, "/product/") ||
+        stringStartsWith(executablePath, "/sbin/") ||
+        stringStartsWith(executablePath, "/system/") ||
+        stringStartsWith(executablePath, "/system_ext/") ||
+        stringStartsWith(executablePath, "/vendor/")) {
+        return true;
+    }
+
+    return false;
+}
+
+
+
 bool shouldUnsetLDVarsFromEnv(bool isNonNativeElf, const char *executablePath) {
     return isNonNativeElf ||
         (stringStartsWith(executablePath, "/system/") &&
@@ -614,7 +664,8 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
 
 int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     const char *origExecutablePath, const char *executablePath,
-    bool interpreterSet, bool shouldEnableSystemLinkerExec, struct TermuxFileHeaderInfo *info) {
+    bool shouldEnableInterpreterExec, bool shouldEnableSystemLinkerExec,
+    struct TermuxFileHeaderInfo *info) {
     int argsCount = 0;
     while (argv[argsCount] != NULL) {
         argsCount++;
@@ -632,7 +683,7 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
 
     int index = 0;
 
-    if (interpreterSet) {
+    if (shouldEnableInterpreterExec) {
         // Use original interpreter path set in executable file as is.
         newArgv[index++] = info->origInterpreterPath;
     } else {
@@ -646,7 +697,7 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     }
 
     // Add interpreter argument and script path if executing a script with shebang.
-    if (interpreterSet) {
+    if (shouldEnableInterpreterExec) {
         if (info->interpreterArg != NULL) {
             newArgv[index++] = info->interpreterArg;
         }
@@ -667,7 +718,7 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
 
 int checkExecArg0BufferOverflow(char *const *argv,
     const char *executablePath, const char *processedExecutablePath,
-    bool interpreterSet) {
+    bool shouldEnableInterpreterExec) {
     logErrorVVerbose(LOG_TAG, "Checking argv[0] buffer overflow");
 
     size_t argv0Length = strlen(argv[0]);
@@ -676,11 +727,18 @@ int checkExecArg0BufferOverflow(char *const *argv,
         if (androidBuildVersionSdk < 23) {
             bool shouldAbort = false;
             char* label = "";
-            if (interpreterSet) {
+            if (shouldEnableInterpreterExec) {
                 char interpreterHeader[TERMUX__FILE_HEADER__BUFFER_SIZE];
-                ssize_t interpreterHeaderLength = readFileHeader("interpreter", executablePath, interpreterHeader, sizeof(interpreterHeader));
+                ssize_t interpreterHeaderLength = readFileHeader("interpreter",
+                    executablePath, interpreterHeader, sizeof(interpreterHeader));
+                // While reading file to read header, the `open()`
+                // call may fail with `No such file or directory (ENOENT)`
+                // on some devices, so skip checking to abort.
+                // Check comment in `execveInterceptInternal()`
+                // for the `readFileHeader()` call for more info.
                 if (interpreterHeaderLength < 0) {
-                    return interpreterHeaderLength;
+                    errno = 0;
+                    return 0;
                 }
 
                 if (isElfFile(interpreterHeader, interpreterHeaderLength)) {

@@ -267,6 +267,31 @@ bool isElfFile(char *header, size_t headerLength);
 
 
 /**
+ * Whether an executable path is for a system executable.
+ *
+ * Android system executables may exist under the following
+ * directories depending on the Android version.
+ * - `/apex`
+ * - `/odm`
+ * - `/product`
+ * - `/sbin`
+ * - `/system`
+ * - `/system_ext`
+ * - `/vendor`
+ *
+ * - https://github.com/termux/termux-packages/wiki/Termux-execution-environment#path-environment-variables-exported-by-android
+ * - https://source.android.com/docs/core/architecture/partitions
+ *
+ * @param executablePath The **normalized** executable path to check.
+ * @return Returns `true` if `executablePath` is a system executable,
+ * otherwise `false`.
+ *
+ */
+bool isSystemExecutable(const char *executablePath);
+
+
+
+/**
  * Whether variables in `LD_VARS_TO_UNSET` should be unset before `exec()`
  * to prevent issues when executing system binaries that are caused
  * if they are set.
@@ -303,16 +328,16 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
 /**
  * Modify the arguments for `execve()`.
  *
- * If `interpreterSet` is set, then `argv[0]` will be set to
- * `TermuxFileHeaderInfo.origInterpreterPath`, otherwise the original
- * `argv[0]` passed to `execve()` will be preserved.
+ * If `shouldEnableInterpreterExec` is enabled, then `argv[0]` will be
+ * set to `TermuxFileHeaderInfo.origInterpreterPath`, otherwise the
+ * original `argv[0]` passed to `execve()` will be preserved.
  *
  * If `shouldEnableSystemLinkerExec` is `true`, then `argv[1]` will be
  * set to `executablePath` to be executed by the linker.
  *
- * If `interpreterSet` is set, then `TermuxFileHeaderInfo.interpreterArg`
- * will be appended if set, followed by the `origExecutablePath`
- * passed to `execve()`.
+ * If `shouldEnableInterpreterExec` is enabled, then
+ * `TermuxFileHeaderInfo.interpreterArg` will be appended if set,
+ * followed by the `origExecutablePath` passed to `execve()`.
  *
  * Any additional arguments to `execve()` will be appended after this.
  *
@@ -322,8 +347,8 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
  *                           `execve()`.
  * @param executablePath The **normalized** executable or interpreter
  *                       path that will actually be executed.
- * @param interpreterSet Whether a interpreter is set in the executable
- *                        file.
+ * @param shouldEnableInterpreterExec Whether interpreter in executable
+ *                       file should be used to execute the path.
  * @param info The `TermuxFileHeaderInfo` for the executable file.
  * @param shouldEnableSystemLinkerExec Whether `system_linker_exec`
  * should be used to execute the path.
@@ -333,7 +358,8 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
  */
 int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
     const char *origExecutablePath, const char *executablePath,
-    bool interpreterSet, bool shouldEnableSystemLinkerExec, struct TermuxFileHeaderInfo *info);
+    bool shouldEnableInterpreterExec, bool shouldEnableSystemLinkerExec,
+    struct TermuxFileHeaderInfo *info);
 
 
 
@@ -352,15 +378,15 @@ int modifyExecArgs(char *const *argv, const char ***newArgvPointer,
  *                        path that will actually be executed.
  * @param processedExecutablePath The **normalized** executable path
  *                        that was passed to `execve()`.
- * @param interpreterSet Whether a interpreter is set in the executable
- *                       file.
+ * @param shouldEnableInterpreterExec Whether interpreter in executable
+ *                       file should be used to execute the path.
  * @return Returns `0` `argv[0]` length is `< 128` or running on
  * Android `>= 6`, otherwise `-1` with errno set to `ENAMETOOLONG` if
  * buffer overflow would occur..
  */
 int checkExecArg0BufferOverflow(char *const *argv,
     const char *executablePath, const char *processedExecutablePath,
-    bool interpreterSet);
+    bool shouldEnableInterpreterExec);
 
 #ifdef __cplusplus
 }
