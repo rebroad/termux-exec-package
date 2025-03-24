@@ -371,13 +371,13 @@ int readFileHeader(const char *label, const char *executablePath,
 
 
     ssize_t headerLength = read(fd, buffer, bufferSize - 1);
+    close(fd);
     // Ensure read was successful, path could be a directory and EISDIR will be returned.
     // - https://man7.org/linux/man-pages/man2/read.2.html
     if (headerLength < 0) {
         logStrerrorDebug(LOG_TAG, "Failed to read %s path '%s' for file header", label, executablePath);
         return -1;
     }
-    close(fd);
 
     return headerLength;
 }
