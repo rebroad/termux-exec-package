@@ -609,7 +609,7 @@ termux_exec__tests__process_script_arguments() {
                         ;;
                     version)
                         TERMUX_EXEC__TESTS__COMMAND_TYPE_NOOP="true"
-                        echo "@TERMUX_EXEC_PKG__VERSION@"; return $?
+                        echo "termux-exec-tests version=@TERMUX_EXEC_PKG__VERSION@ org=@TERMUX__REPOS_HOST_ORG_NAME@ project=termux-exec-package"; return $?
                         ;;
                     quiet)
                         TERMUX_EXEC__TESTS__LOG_LEVEL=0

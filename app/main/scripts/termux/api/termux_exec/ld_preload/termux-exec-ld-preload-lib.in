@@ -40,7 +40,7 @@ termux_exec__ld_preload_lib__main() {
         termux_exec__ld_preload_lib__show_help || return $?
         return 0
     elif [ "${1:-}" = "--version" ]; then
-        echo "@TERMUX_EXEC_PKG__VERSION@" || return $?
+        echo "termux-exec-ld-preload-lib version=@TERMUX_EXEC_PKG__VERSION@ org=@TERMUX__REPOS_HOST_ORG_NAME@ project=termux-exec-package"; return $?
         return 0
     fi
 

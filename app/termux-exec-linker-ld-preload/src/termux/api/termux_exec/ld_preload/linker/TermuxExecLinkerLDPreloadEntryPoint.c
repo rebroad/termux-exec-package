@@ -19,10 +19,13 @@
  * `nm --demangle --dynamic --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/lib/libtermux-exec-linker-ld-preload.so`.
  */
 
+#define LIBTERMUX_EXEC_LINKER_LD_PRELOAD__VERSION_NAME TERMUX_EXEC_PKG__VERSION
+#define LIBTERMUX_EXEC_LINKER_LD_PRELOAD__VERSION_STRING "libtermux-exec-linker-ld-preload version=" TERMUX_EXEC_PKG__VERSION " org=" TERMUX__REPOS_HOST_ORG_NAME " project=termux-exec-package"
+
 
 
 void termuxExec_linkerLdPreload_initProcess() {
-    termuxExec_process_initProcess(TERMUX_EXEC_PKG__VERSION "+linker-ld-preload", NULL);
+    termuxExec_process_initProcess(LIBTERMUX_EXEC_LINKER_LD_PRELOAD__VERSION_STRING, NULL);
 }
 
 

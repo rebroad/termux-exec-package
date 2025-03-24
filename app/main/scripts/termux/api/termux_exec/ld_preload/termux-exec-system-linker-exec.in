@@ -32,7 +32,7 @@ termux_exec__system_linker_exec__main() {
         termux_exec__system_linker_exec__show_help || return $?
         return 0
     elif [ "${1:-}" = "--version" ]; then
-        echo "@TERMUX_EXEC_PKG__VERSION@" || return $?
+        echo "termux-exec-system-linker-exec version=@TERMUX_EXEC_PKG__VERSION@ org=@TERMUX__REPOS_HOST_ORG_NAME@ project=termux-exec-package"; return $?
         return 0
     fi
 

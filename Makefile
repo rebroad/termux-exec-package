@@ -6,6 +6,8 @@ export TERMUX_EXEC_PKG__TESTS__API_LEVEL :=
 export TERMUX__NAME := Termux# Default value: `Termux`
 export TERMUX__LNAME := termux# Default value: `termux`
 
+export TERMUX__REPOS_HOST_ORG_NAME := termux# Default value: `termux`
+
 export TERMUX_APP__NAME := Termux# Default value: `Termux`
 export TERMUX_APP__PACKAGE_NAME := com.termux# Default value: `com.termux`
 export TERMUX_APP__DATA_DIR := /data/data/$(TERMUX_APP__PACKAGE_NAME)# Default value: `/data/data/com.termux`
@@ -93,6 +95,7 @@ export override TERMUX__CONSTANTS__MACRO_FLAGS := \
 	-DTERMUX_EXEC_PKG__VERSION=\"$(TERMUX_EXEC_PKG__VERSION)\" \
 	-DTERMUX__NAME=\"$(TERMUX__NAME)\" \
 	-DTERMUX__LNAME=\"$(TERMUX__LNAME)\" \
+	-DTERMUX__REPOS_HOST_ORG_NAME=\"$(TERMUX__REPOS_HOST_ORG_NAME)\" \
 	-DTERMUX_APP__DATA_DIR=\"$(TERMUX_APP__DATA_DIR)\" \
 	-DTERMUX__ROOTFS=\"$(TERMUX__ROOTFS)\" \
 	-DTERMUX__PREFIX=\"$(TERMUX__PREFIX)\" \
@@ -107,6 +110,7 @@ export override TERMUX__CONSTANTS__SED_ARGS := \
 	-e "s%[@]TERMUX_EXEC_PKG__VERSION[@]%$(TERMUX_EXEC_PKG__VERSION)%g" \
 	-e "s%[@]TERMUX_EXEC_PKG__ARCH[@]%$(TERMUX_EXEC_PKG__ARCH)%g" \
 	-e "s%[@]TERMUX__LNAME[@]%$(TERMUX__LNAME)%g" \
+	-e "s%[@]TERMUX__REPOS_HOST_ORG_NAME[@]%$(TERMUX__REPOS_HOST_ORG_NAME)%g" \
 	-e "s%[@]TERMUX_APP__NAME[@]%$(TERMUX_APP__NAME)%g" \
 	-e "s%[@]TERMUX_APP__PACKAGE_NAME[@]%$(TERMUX_APP__PACKAGE_NAME)%g" \
 	-e "s%[@]TERMUX_APP__DATA_DIR[@]%$(TERMUX_APP__DATA_DIR)%g" \

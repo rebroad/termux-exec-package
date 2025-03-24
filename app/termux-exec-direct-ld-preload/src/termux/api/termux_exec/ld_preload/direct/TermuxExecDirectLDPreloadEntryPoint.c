@@ -19,10 +19,13 @@
  * `nm --demangle --dynamic --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/lib/libtermux-exec-direct-ld-preload.so`.
  */
 
+#define LIBTERMUX_EXEC_DIRECT_LD_PRELOAD__VERSION_NAME TERMUX_EXEC_PKG__VERSION
+#define LIBTERMUX_EXEC_DIRECT_LD_PRELOAD__VERSION_STRING "libtermux-exec-direct-ld-preload version=" LIBTERMUX_EXEC_DIRECT_LD_PRELOAD__VERSION_NAME " org=" TERMUX__REPOS_HOST_ORG_NAME " project=termux-exec-package"
+
 
 
 void termuxExec_directLdPreload_initProcess() {
-    termuxExec_process_initProcess(TERMUX_EXEC_PKG__VERSION "+direct-ld-preload", NULL);
+    termuxExec_process_initProcess(LIBTERMUX_EXEC_DIRECT_LD_PRELOAD__VERSION_STRING, NULL);
 }
 
 
