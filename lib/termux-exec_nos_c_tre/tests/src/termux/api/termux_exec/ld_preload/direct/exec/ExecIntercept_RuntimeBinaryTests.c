@@ -114,6 +114,13 @@ FEXECVE_CALL_IMPL()
     if (info.isChild) {                                                                            \
         int actualReturnValue;                                                                     \
         execWrapper(variant, name, envp, __VA_ARGS__);                                             \
+        /* Do not log failure logs to stdout of parent and log them to original stderr of child,   \
+           otherwise they would get captured in `output` of parent and compared with               \
+           `output_regex`. */                                                                      \
+        if (dup2(info.stderrFd, STDERR_FILENO) == -1) {                                            \
+            logStrerror(LOG_TAG, "Failed to restore child stderr");                                \
+            exitForkWithError(&info, 1);                                                           \
+        }                                                                                          \
         int actualErrno = errno;                                                                   \
         int testFailed = 0;                                                                        \
         if (actualReturnValue != expectedReturnValue) {                                            \
