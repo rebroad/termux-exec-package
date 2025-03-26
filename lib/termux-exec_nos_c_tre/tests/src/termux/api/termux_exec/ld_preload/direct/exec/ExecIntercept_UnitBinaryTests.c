@@ -107,12 +107,14 @@ void test__inspectFileHeader__Basic() {
 
 
 void test__modifyExecEnv__unsetLDVars();
+void test__modifyExecEnv__unsetLDPreload();
 void test__modifyExecEnv__setProcSelfExe();
 
 void test__modifyExecEnv() {
     logVerbose(LOG_TAG, "test__modifyExecEnv()");
 
     test__modifyExecEnv__unsetLDVars();
+    test__modifyExecEnv__unsetLDPreload();
     test__modifyExecEnv__setProcSelfExe();
 
     int__AEqual(0, errno);
@@ -124,7 +126,7 @@ void test__modifyExecEnv__unsetLDVars() {
     {
     char *testEnv[] = {"MY_ENV=1", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, NULL, true);
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, true, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     state__ATrue(allocatedEnvp[1] == NULL);
@@ -134,7 +136,7 @@ void test__modifyExecEnv__unsetLDVars() {
     {
     char *testEnv[] = {"MY_ENV=1", ENV_PREFIX__LD_PRELOAD "a", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, NULL, true);
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, true, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     state__ATrue(allocatedEnvp[1] == NULL);
@@ -144,12 +146,87 @@ void test__modifyExecEnv__unsetLDVars() {
     {
     char *testEnv[] = {"MY_ENV=1", ENV_PREFIX__LD_PRELOAD "a", "A=B", ENV_PREFIX__LD_LIBRARY_PATH "B", "B=C", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, NULL, true);
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, true, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     string__AEqual(allocatedEnvp[1], "A=B");
     string__AEqual(allocatedEnvp[2], "B=C");
     state__ATrue(allocatedEnvp[3] == NULL);
+    free(allocatedEnvp);
+    }
+}
+
+void test__modifyExecEnv__unsetLDPreload() {
+    logVVerbose(LOG_TAG, "test__modifyExecEnv__unsetLDPreload()");
+
+    {
+    char *testEnv[] = {"MY_ENV=1", NULL};
+    char **allocatedEnvp;
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, true);
+    state__ATrue(allocatedEnvp != NULL);
+    string__AEqual(allocatedEnvp[0], "MY_ENV=1");
+    state__ATrue(allocatedEnvp[1] == NULL);
+    free(allocatedEnvp);
+    }
+
+    {
+    char *testEnv[] = {"MY_ENV=1", ENV_PREFIX__LD_PRELOAD "a", NULL};
+    char **allocatedEnvp;
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, true);
+    state__ATrue(allocatedEnvp != NULL);
+    string__AEqual(allocatedEnvp[0], "MY_ENV=1");
+    string__AEqual(allocatedEnvp[1], ENV_PREFIX__LD_PRELOAD "a");
+    state__ATrue(allocatedEnvp[2] == NULL);
+    free(allocatedEnvp);
+    }
+
+    {
+    char *testEnv[] = {"MY_ENV=1", ENV_PREFIX__LD_PRELOAD, NULL};
+    char **allocatedEnvp;
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, true);
+    state__ATrue(allocatedEnvp != NULL);
+    string__AEqual(allocatedEnvp[0], "MY_ENV=1");
+    state__ATrue(allocatedEnvp[1] == NULL);
+    free(allocatedEnvp);
+    }
+
+    {
+    char *testEnv[] = {"MY_ENV=1", ENV_PREFIX__LD_PRELOAD "a", "A=B", ENV_PREFIX__LD_LIBRARY_PATH "B", "B=C", NULL};
+    char **allocatedEnvp;
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, true);
+    state__ATrue(allocatedEnvp != NULL);
+    string__AEqual(allocatedEnvp[0], "MY_ENV=1");
+    string__AEqual(allocatedEnvp[1], ENV_PREFIX__LD_PRELOAD "a");
+    string__AEqual(allocatedEnvp[2], "A=B");
+    string__AEqual(allocatedEnvp[3], ENV_PREFIX__LD_LIBRARY_PATH "B");
+    string__AEqual(allocatedEnvp[4], "B=C");
+    state__ATrue(allocatedEnvp[5] == NULL);
+    free(allocatedEnvp);
+    }
+
+    {
+    char *testEnv[] = {"MY_ENV=1", ENV_PREFIX__LD_PRELOAD, "A=B", ENV_PREFIX__LD_LIBRARY_PATH "B", "B=C", NULL};
+    char **allocatedEnvp;
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, true);
+    state__ATrue(allocatedEnvp != NULL);
+    string__AEqual(allocatedEnvp[0], "MY_ENV=1");
+    string__AEqual(allocatedEnvp[1], "A=B");
+    string__AEqual(allocatedEnvp[2], ENV_PREFIX__LD_LIBRARY_PATH "B");
+    string__AEqual(allocatedEnvp[3], "B=C");
+    state__ATrue(allocatedEnvp[4] == NULL);
+    free(allocatedEnvp);
+    }
+
+    {
+    char *testEnv[] = {"MY_ENV=1", "A=B", ENV_PREFIX__LD_LIBRARY_PATH "B", "B=C", NULL};
+    char **allocatedEnvp;
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, true);
+    state__ATrue(allocatedEnvp != NULL);
+    string__AEqual(allocatedEnvp[0], "MY_ENV=1");
+    string__AEqual(allocatedEnvp[1], "A=B");
+    string__AEqual(allocatedEnvp[2], ENV_PREFIX__LD_LIBRARY_PATH "B");
+    string__AEqual(allocatedEnvp[3], "B=C");
+    state__ATrue(allocatedEnvp[4] == NULL);
     free(allocatedEnvp);
     }
 }
@@ -163,7 +240,7 @@ void test__modifyExecEnv__setProcSelfExe() {
 
     char *testEnv[] = {"MY_ENV=1", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, &termuxProcSelfExe, false);
+    modifyExecEnv(testEnv, &allocatedEnvp, &termuxProcSelfExe, false, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     string__AEqual(allocatedEnvp[1], ENV__TERMUX_EXEC__PROC_SELF_EXE "=" TERMUX__PREFIX__BIN_DIR "/bash");
@@ -177,7 +254,7 @@ void test__modifyExecEnv__setProcSelfExe() {
 
     char *testEnv[] = {"MY_ENV=1", ENV__TERMUX_EXEC__PROC_SELF_EXE "=" TERMUX__PREFIX__BIN_DIR "/python", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, &termuxProcSelfExe, false);
+    modifyExecEnv(testEnv, &allocatedEnvp, &termuxProcSelfExe, false, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     string__AEqual(allocatedEnvp[1], ENV__TERMUX_EXEC__PROC_SELF_EXE "=" TERMUX__PREFIX__BIN_DIR "/bash");
@@ -188,7 +265,7 @@ void test__modifyExecEnv__setProcSelfExe() {
     {
     char *testEnv[] = {"MY_ENV=1", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false);
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     state__ATrue(allocatedEnvp[1] == NULL);
@@ -198,7 +275,7 @@ void test__modifyExecEnv__setProcSelfExe() {
     {
     char *testEnv[] = {"MY_ENV=1", ENV__TERMUX_EXEC__PROC_SELF_EXE "=" TERMUX__PREFIX__BIN_DIR "/python", NULL};
     char **allocatedEnvp;
-    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false);
+    modifyExecEnv(testEnv, &allocatedEnvp, NULL, false, false);
     state__ATrue(allocatedEnvp != NULL);
     string__AEqual(allocatedEnvp[0], "MY_ENV=1");
     state__ATrue(allocatedEnvp[1] == NULL);

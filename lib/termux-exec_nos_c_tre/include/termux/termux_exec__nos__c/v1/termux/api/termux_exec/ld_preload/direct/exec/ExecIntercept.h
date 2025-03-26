@@ -316,12 +316,15 @@ bool shouldUnsetLDVarsFromEnv(bool isNonNativeElf, const char *executablePath);
  *                             env variable.
  * @param unsetLdVarsFromEnv If `true`, then variables in
  *                           `LD_VARS_TO_UNSET` will be unset.
+ * @param unsetLdPreloadFromEnv If `true`, then `ENV__LD_PRELOAD`
+ *                           variable will be unset.
  * @return Returns `0` if successfully modified the env, otherwise
  * `-1` on failures. Its the callers responsibility to call `free()`
  * on the `newEnvpPointer` passed.
  */
 int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
-    char** envTermuxProcSelfExe, bool unsetLdVarsFromEnv);
+    char** envTermuxProcSelfExe, bool unsetLdVarsFromEnv,
+    bool unsetLdPreloadFromEnv);
 
 
 

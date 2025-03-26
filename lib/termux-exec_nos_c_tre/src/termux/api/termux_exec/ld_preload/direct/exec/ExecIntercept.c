@@ -273,11 +273,39 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
     bool modifyEnv = false;
+    bool unsetLdPreloadFromEnv = false;
     bool unsetLdVarsFromEnv = shouldUnsetLDVarsFromEnv(info.isNonNativeElf, executablePath);
     logErrorVVerbose(LOG_TAG, "unset_ld_vars_from_env: '%d'", unsetLdVarsFromEnv);
 
-    if (unsetLdVarsFromEnv && areVarsInEnv(envp, LD_VARS_TO_UNSET, LD_VARS_TO_UNSET_SIZE)) {
-        modifyEnv = true;
+    if (unsetLdVarsFromEnv) {
+        // If set to empty or non-empty values.
+        modifyEnv = areVarsInEnv(envp, LD_VARS_TO_UNSET, LD_VARS_TO_UNSET_SIZE);
+    } else {
+        // If set to empty values.
+        // On older android versions, at least on Android `<= 7`,
+        // running commands with empty `$LD_PRELOAD` variable, like
+        // `LD_PRELOAD= <command>` will fail with `CANNOT LINK EXECUTABLE`,
+        // errors with a random environment variable `<name=value>` pair
+        // or `DT_RUNPATH` directory loaded as a library.
+        // So if an empty `LD_` variable is found, we unset it from
+        // the environment. Error has not been noticed to occur with
+        // empty `$LD_LIBRARY_PATH`, so do not remove that, as that
+        // could cause problems with user `set -u` shell scripts if
+        // they are setting empty values and reading in a subprocess.
+        // ```
+        // # Android 7
+        // $ LD_PRELOAD="" /system/bin/sh
+        // CANNOT LINK EXECUTABLE "/system/bin/sh": cant read file "/system/lib64": Is a directory
+        // # Android 6
+        // $ LD_PRELOAD= /system/bin/sh
+        // CANNOT LINK EXECUTABLE: library "_=/system/bin/sh" not found
+        // ```
+        const char *ld_preload_var[] = { ENV_PREFIX__LD_PRELOAD };
+        if (areEmptyVarsInEnv(envp, ld_preload_var, 1)) {
+            unsetLdPreloadFromEnv = true;
+            modifyEnv = true;
+            logErrorVVerbose(LOG_TAG, "unset_ld_preload_from_env: '%d'", unsetLdPreloadFromEnv);
+        }
     }
 
 
@@ -309,7 +337,7 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
     char **newEnvp = NULL;
     if (modifyEnv) {
-        if (modifyExecEnv(envp, &newEnvp, &envTermuxProcSelfExe, unsetLdVarsFromEnv) != 0 ||
+        if (modifyExecEnv(envp, &newEnvp, &envTermuxProcSelfExe, unsetLdVarsFromEnv, unsetLdPreloadFromEnv) != 0 ||
             newEnvp == NULL) {
             logErrorDebug(LOG_TAG, "Failed to create modified exec env");
             free(envTermuxProcSelfExe);
@@ -607,7 +635,8 @@ bool shouldUnsetLDVarsFromEnv(bool isNonNativeElf, const char *executablePath) {
 }
 
 int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
-    char** envTermuxProcSelfExe, bool unsetLdVarsFromEnv) {
+    char** envTermuxProcSelfExe, bool unsetLdVarsFromEnv,
+    bool unsetLdPreloadFromEnv) {
     int envCount = 0;
     while (envp[envCount] != NULL) {
         envCount++;
@@ -651,7 +680,12 @@ int modifyExecEnv(char *const *envp, char ***newEnvpPointer,
                 for (int j = 0; j < LD_VARS_TO_UNSET_SIZE; j++) {
                     if (stringStartsWith(envp[i], LD_VARS_TO_UNSET[j])) {
                         keep = false;
+                        break;
                     }
+                }
+            } else if (unsetLdPreloadFromEnv) {
+                if (strcmp(envp[i], ENV_PREFIX__LD_PRELOAD) == 0) {
+                    keep = false;
                 }
             }
 
