@@ -174,8 +174,11 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
     // - https://man7.org/linux/man-pages/man2/access.2.html
     if (access(executablePath, X_OK) != 0) {
         // Error out if the file does not exist or is not executable
-        // fd paths like to a pipes should not be executable either and
-        // they cannot be seek-ed back if interpreter were to be read.
+        // fd paths like to a sockets/pipes should not be executable
+        // either and they cannot be seek-ed back if interpreter were
+        // to be read.
+        // `access(X_OK)` will return `EACCES` for socket files,
+        // which is what `execve()` also returns for non-regular files.
         // - https://github.com/bminor/bash/blob/bash-5.2/shell.c#L1649
         logStrerrorDebug(LOG_TAG, "Failed to access executable path '%s'", processedExecutablePath);
         return -1;
@@ -216,6 +219,12 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
         // `No such file or directory (ENOENT)`,
         // like `Is a directory (EISDIR)`.
         if (headerLength < 0 && errno != ENOENT) {
+            // `execve()` is expected to return `EACCES` for
+            // non-regular files and is also mentioned in its man page.
+            // > EACCES The file or a script interpreter is not a regular file.
+            if (errno == EISDIR || errno == ENXIO) {
+                errno = EACCES;
+            }
             return headerLength;
         }
     }
@@ -247,6 +256,16 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
     // Check if `system_linker_exec` is required.
     int shouldEnableSystemLinkerExecResult = shouldEnableSystemLinkerExecForFile(executablePath);
     if (shouldEnableSystemLinkerExecResult < 0) {
+        // `execve()` is expected to return `EACCES` for
+        // non-regular files and is also mentioned in its man page.
+        // > EACCES The file or a script interpreter is not a regular file.
+        // The `getRegularFileFdRealPath()` function called by
+        // `termuxApp_dataDir_isPathUnder()` will return following
+        // `errno` for non-regular files.
+        if (errno == EISDIR || errno == ENXIO) {
+            errno = EACCES;
+        }
+        logStrerrorDebug(LOG_TAG, "Failed to check if system linker exec should be enabled for executable path '%s'", executablePath);
         return -1;
     }
     bool shouldEnableSystemLinkerExec = shouldEnableSystemLinkerExecResult == 0 ? true : false;

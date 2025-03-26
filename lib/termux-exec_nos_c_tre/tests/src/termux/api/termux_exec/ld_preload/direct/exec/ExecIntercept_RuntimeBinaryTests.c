@@ -331,10 +331,22 @@ void test__execIntercept() {
 void test__execIntercept__Basic() {
     logVVerbose(LOG_TAG, "test__execIntercept__Basic()");
 
-    runAllExecWrappersTest("rootfs",
-        -1, EISDIR, -1, EISDIR,
+    runAllExecWrappersTest("android-proc",
+        -1, EACCES, -1, EACCES,
         0, NULL, 0, NULL, 0,
-        "../../", TERMUX__ROOTFS, environ,
+        ".", "/proc", environ,
+        NULL);
+
+    runAllExecWrappersTest("termux-rootfs",
+        -1, EACCES, -1, EACCES,
+        0, NULL, 0, NULL, 0,
+        ".", TERMUX__ROOTFS, environ,
+        NULL);
+
+    runAllExecWrappersTest("system-app",
+        -1, EACCES, -1, EACCES,
+        0, NULL, 0, NULL, 0,
+        ".", "/system/app", environ,
         NULL);
 }
 
