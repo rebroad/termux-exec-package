@@ -25,10 +25,6 @@ void ExecIntercept_runTests() {
 #define FEXECVE_SUPPORTED 1
 #endif
 
-#ifndef __ANDROID__
-#define FEXECVE_SUPPORTED 1
-#endif
-
 #if defined FEXECVE_SUPPORTED
 #define FEXECVE_CALL_IMPL()                                                                        \
 int fexecveCall(int fd, char *const *argv, char *const *envp) {                                    \
