@@ -210,7 +210,7 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
     //     - https://github.com/termux/termux-exec-package/issues/32
     // - `/system/bin/app_process`.
     //     - https://github.com/termux/termux-app/issues/4440#issuecomment-2746002438
-    if (isSystemExecutable(executablePath)) {
+    if (isExecutableUnderSystemDir(executablePath)) {
         logErrorVVerbose(LOG_TAG, "read_file_header: '0'");
     } else {
         logErrorVVerbose(LOG_TAG, "read_file_header: '1'");
@@ -609,7 +609,7 @@ bool isElfFile(char *header, size_t headerLength) {
 
 
 
-bool isSystemExecutable(const char *executablePath) {
+bool isExecutableUnderSystemDir(const char *executablePath) {
     if (
         stringStartsWith(executablePath, "/apex/") ||
         stringStartsWith(executablePath, "/odm/") ||

@@ -267,7 +267,7 @@ bool isElfFile(char *header, size_t headerLength);
 
 
 /**
- * Whether an executable path is for a system executable.
+ * Whether an executable path is under a system directory.
  *
  * Android system executables may exist under the following
  * directories depending on the Android version.
@@ -283,11 +283,11 @@ bool isElfFile(char *header, size_t headerLength);
  * - https://source.android.com/docs/core/architecture/partitions
  *
  * @param executablePath The **normalized** executable path to check.
- * @return Returns `true` if `executablePath` is a system executable,
- * otherwise `false`.
+ * @return Returns `true` if `executablePath` is under a system
+ * directory, otherwise `false`.
  *
  */
-bool isSystemExecutable(const char *executablePath);
+bool isExecutableUnderSystemDir(const char *executablePath);
 
 
 
