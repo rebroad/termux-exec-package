@@ -5,6 +5,10 @@
 
 
 
+static void (*onExecTestChildFork)(ForkInfo *info) = initChild;
+
+
+
 void test__execIntercept();
 
 
@@ -100,7 +104,7 @@ FEXECVE_CALL_IMPL()
     INIT_FORK_INFO(info);                                                                          \
     info.parentLogTag = LOG_TAG;                                                                   \
     info.childLogTag = LOG_TAG;                                                                    \
-    info.onChildFork = initChild;                                                                  \
+    info.onChildFork = onExecTestChildFork;                                                        \
     int result = forkChild(&info);                                                                 \
     if (result != 0) {                                                                             \
         logError(LOG_TAG, "Unexpected return value for forkChild '%d'", result);                   \
