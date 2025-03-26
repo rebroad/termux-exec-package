@@ -275,6 +275,7 @@ FEXECVE_CALL_IMPL()
 
 
 void test__execIntercept__Basic();
+void test__execIntercept__AndroidTools(char* envCurrentPath);
 void test__execIntercept__Files(const char* termuxExec_tests_testsPath, const char* currentPath, char* envCurrentPath);
 void test__execIntercept__PackageManager();
 
@@ -317,6 +318,7 @@ void test__execIntercept() {
     // - https://cs.android.com/android/platform/superproject/+/android-14.0.0_r18:bionic/tests/utils.h;l=200
 
     test__execIntercept__Basic();
+    test__execIntercept__AndroidTools(envCurrentPath);
     test__execIntercept__Files(termuxExec_tests_testsPath, currentPath, envCurrentPath);
     test__execIntercept__PackageManager();
 
@@ -324,6 +326,14 @@ void test__execIntercept() {
 
     // We cannot free this in a test function that sets it as later test cases will use it.
     free(envCurrentPath);
+}
+
+
+
+static void test__execIntercept_initChildWithRedirectedFd(ForkInfo *info) {
+    initChild(info);
+
+    info->redirectChildStdinToDevNull = true;
 }
 
 
@@ -348,6 +358,127 @@ void test__execIntercept__Basic() {
         0, NULL, 0, NULL, 0,
         ".", "/system/app", environ,
         NULL);
+}
+
+void test__execIntercept__AndroidTools(char* envCurrentPath) {
+    logVVerbose(LOG_TAG, "test__execIntercept__AndroidTools()");
+
+    onExecTestChildFork = test__execIntercept_initChildWithRedirectedFd;
+
+     // execlp(), execvp() and execvpe() search for file to be executed in $PATH,
+    // so set it to `/system/bin` directory.
+    char* envNewPath = NULL;
+
+    if (asprintf(&envNewPath, "%s%s", ENV_PREFIX__PATH, "/apex/com.android.art/bin:/system/bin") == -1) {
+        errno = ENOMEM;
+        logStrerrorDebug(LOG_TAG, "asprintf failed for new '%s%s'", ENV_PREFIX__PATH, "/apex/com.android.art/bin:/system/bin");
+        exit(1);
+    }
+
+    putenv(envNewPath);
+
+
+    // On Android `14`, `/system/bin/am` can only be run with `adb`
+    // and `root` users and will normally have no output and exit code
+    // will be `255`.
+    // - https://github.com/termux/TermuxAm/commit/8a08e9bd
+    if (android_buildVersionSdk_get() < 34) {
+        char* amPath = "/system/bin/am";
+
+        runAllExecWrappersTest("android-am",
+            0, 0, 0, 0,
+            -1, "^.*<INTENT> specifications.*", -1, "^.*<INTENT> specifications.*", REG_EXTENDED | REG_ICASE,
+            "am", amPath, environ,
+            NULL);
+
+
+        // Simulate `fexecve()`, especially for Android `< 9`.
+        // This will also test `LD_LIBRARY_PATH` being unset on older
+        // Android versions to prevent `CANNOT LINK EXECUTABLE` errors.
+        int amFd = open(amPath, 0);
+        if (amFd == -1) {
+            logStrerror(LOG_TAG, "open() call failed for am at path '%s'", amPath);
+            exit(1);
+        }
+
+        char amFdPath[40];
+        snprintf(amFdPath, sizeof(amFdPath), "/proc/self/fd/%d", amFd);
+
+        logVVerbose(LOG_TAG, "%s_exec()", "android-am-fd");                                                   \
+        runExecTest("android-am-fd",
+            0, 0,
+            -1, "^.*<INTENT> specifications.*", REG_EXTENDED | REG_ICASE,
+            ExecVE, amFdPath, environ, amPath, NULL);
+    }
+
+
+    // On Android `< 9`, `/system/bin/pm` did not have a `#!/system/bin/sh`
+    // interpreter and `execve` would fail with `Exec format error (ENOEXEC)`.
+    // So interpret the `pm` script with `sh` instead of executing it.
+    // - https://cs.android.com/android/_/android/platform/frameworks/base/+/6c168885
+    char* pmPath = "/system/bin/pm";
+    if (android_buildVersionSdk_get() < 29) {
+        runAllExecWrappersTest("android-pm",
+            0, 0, 0, 0,
+            -1, "^.*path to the \\.apk.*", -1, "^.*path to the \\.apk.*", REG_EXTENDED | REG_ICASE,
+            NULL, "/system/bin/sh", environ,
+            pmPath, NULL);
+
+    } else {
+        runAllExecWrappersTest("android-pm",
+            0, 0, 0, 0,
+            -1, "^.*path to the \\.apk.*", -1, "^.*path to the \\.apk.*", REG_EXTENDED | REG_ICASE,
+            "pm", pmPath, environ,
+            NULL);
+    }
+
+
+    // On Android `>= 13`, `dalvikvm` is part of Android Runtime APEX module.
+    // - https://cs.android.com/android/_/android/platform/art/+/38a938e2
+    // - https://cs.android.com/android/_/android/platform/bionic/+/6d5277db
+    char* dalvikvmPath;
+    if (access("/apex/com.android.art/bin/dalvikvm", X_OK) == 0) {
+        dalvikvmPath = "/apex/com.android.art/bin/dalvikvm";
+    } else {
+        dalvikvmPath = "/system/bin/dalvikvm";
+    }
+
+    char* dalvikvmOutputRegex = "^.*((-classpath ((classpath)|(\\{string value\\})))|(Class name required)).*";
+
+    // The `-h` flag does not print help on Android `7`, but Android `6` does.
+    runAllExecWrappersTest("android-dalvikvm",
+        0, 0, 0, 0,
+        -1, dalvikvmOutputRegex, -1, dalvikvmOutputRegex, REG_EXTENDED | REG_ICASE,
+        "dalvikvm", dalvikvmPath, environ,
+        "-h", NULL);
+
+
+    // Simulate `fexecve()`, especially for Android `< 9`.
+    // This will also test `LD_LIBRARY_PATH` being unset on older
+    // Android versions to prevent `CANNOT LINK EXECUTABLE` errors.
+    int dalvikvmFd = open(dalvikvmPath, 0);
+    if (dalvikvmFd == -1) {
+        logStrerror(LOG_TAG, "open() call failed for dalvikvm at path '%s'", dalvikvmPath);
+        exit(1);
+    }
+
+    char dalvikvmFdPath[40];
+    snprintf(dalvikvmFdPath, sizeof(dalvikvmFdPath), "/proc/self/fd/%d", dalvikvmFd);
+
+    logVVerbose(LOG_TAG, "%s_exec()", "android-dalvikvm-fd");                                                   \
+    runExecTest("android-dalvikvm-fd",
+        0, 0,
+        -1, dalvikvmOutputRegex, REG_EXTENDED | REG_ICASE,
+        ExecVE, dalvikvmFdPath, environ, dalvikvmPath, "-h", NULL);
+
+
+    putenv(envCurrentPath);
+
+
+    free(envNewPath);
+
+    onExecTestChildFork = initChild;
+
 }
 
 void test__execIntercept__Files(const char* termuxExec_tests_testsPath, const char* currentPath, char* envCurrentPath) {

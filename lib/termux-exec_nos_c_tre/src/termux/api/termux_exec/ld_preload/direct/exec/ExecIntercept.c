@@ -91,6 +91,12 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
     //   For instance, `$TERMUX__PREFIX/bin/ls` is a symlink to `$TERMUX__PREFIX/bin/coreutils`,
     //   but we need to execute `$TERMUX__PREFIX/bin/ls` `/system/bin/linker $TERMUX__PREFIX/bin/ls`
     //   so that coreutils knows what to execute.
+    // - For an fd path, like `/proc/self/fd/<num>` or `/proc/<pid>/fd/<num>`,
+    //   normally for the `fexecve()` call, we find its real path,
+    //   so that so if its not under a system directory. then its file
+    //   header is always read. And if it is under a system directory,
+    //   then `LD_VARS_TO_UNSET` are unset properly as per
+    //   `unsetLdVarsFromEnv` or `unsetLdPreloadFromEnv`.
     // - For an absolute path, we need to normalize first so that an
     //   unnormalized prefix like `/usr/./bin` is replaced with `/usr/bin`
     //   so that `termuxPrefixPath()` can successfully match it to
@@ -117,7 +123,24 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
 
 
     char processedExecutablePathBuffer[PATH_MAX];
-    if (executablePath[0] == '/') {
+    if (isFdPath(executablePath)) {
+        executablePath = getRegularFileFdRealPath(LOG_TAG, executablePath,
+            processedExecutablePathBuffer, sizeof(processedExecutablePathBuffer));
+        if (executablePath == NULL) {
+            // `execve()` is expected to return `EACCES` for
+            // non-regular files and is also mentioned in its man page.
+            // > EACCES The file or a script interpreter is not a regular file.
+            // The `getRegularFileFdRealPath()` function will return
+            // following `errno` for non-regular files.
+            if (errno == EISDIR || errno == ENXIO) {
+                errno = EACCES;
+            }
+            logStrerrorDebug(LOG_TAG, "Failed to get real path for fd executable path '%s'", origExecutablePath);
+            return -1;
+        }
+
+        logErrorVVerbose(LOG_TAG, "real_executable: '%s'", executablePath);
+    } else if (executablePath[0] == '/') {
         // If path is absolute, then normalize first and then replace termux prefix.
         executablePath = normalizePath(executablePathBuffer, false, true);
         if (executablePath == NULL) {
@@ -210,6 +233,22 @@ int execveInterceptInternal(const char *origExecutablePath, char *const argv[], 
     //     - https://github.com/termux/termux-exec-package/issues/32
     // - `/system/bin/app_process`.
     //     - https://github.com/termux/termux-app/issues/4440#issuecomment-2746002438
+    //
+    // A script running with `system_linker_exec` must always be run
+    // with its interpreter in the shebang instead of directly,
+    // otherwise execution will fail with errors like following.
+    // The `system_linker_exec` is only used if path is under
+    // Termux app data directory, and we skip reading file header only
+    // if its under a system directory. Since app data directories
+    // are either under `/data` or `/mnt`, there is no conflict with
+    // system directories, and so file headers for files under app
+    // data directories should always be read.
+    // error: "/data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-linux-script.sh" \
+    //     is too small to be an ELF executable: only found 52 bytes
+    // - https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:bionic/linker/linker_phdr.cpp;l=216
+    // error: "/data/data/com.termux/files/usr/bin/login" \
+    //     has bad ELF magic: 23212f64
+    // - https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:bionic/linker/linker_phdr.cpp;l=234
     if (isExecutableUnderSystemDir(executablePath)) {
         logErrorVVerbose(LOG_TAG, "read_file_header: '0'");
     } else {
