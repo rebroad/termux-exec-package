@@ -160,7 +160,7 @@ FEXECVE_CALL_IMPL()
             logError(LOG_TAG, "FAILED: '%s' '%s()' test", testName, EXEC_VARIANTS_STR[variant]);   \
             logError(LOG_TAG, "Expected output_regex does not equal match actual output");         \
             testFailed=1;                                                                          \
-        } else if (actualExitCode != expectedExitCode) {                                           \
+        } else if ((expectedExitCode != -1 && actualExitCode != expectedExitCode) || actualExitCode == 100) { \
             logError(LOG_TAG, "FAILED: '%s' '%s()' test", testName, EXEC_VARIANTS_STR[variant]);   \
             logError(LOG_TAG, "Expected exit_code does not equal actual exit_code");               \
             testFailed=1;                                                                          \
