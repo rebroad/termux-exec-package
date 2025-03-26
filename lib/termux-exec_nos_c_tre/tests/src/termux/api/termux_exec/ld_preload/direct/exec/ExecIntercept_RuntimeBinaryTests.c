@@ -207,10 +207,12 @@ FEXECVE_CALL_IMPL()
             ExecL, path, NULL, path, __VA_ARGS__);                                                 \
     }                                                                                              \
     {                                                                                              \
-        /* ExecLP */                                                                               \
-        runExecTest(testName, expectedReturnValueP, expectedErrnoP,                                \
-            expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                     \
-            ExecLP, file, NULL, file, __VA_ARGS__);                                                \
+        if (file != NULL) {                                                                        \
+            /* ExecLP */                                                                           \
+            runExecTest(testName, expectedReturnValueP, expectedErrnoP,                            \
+                expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                 \
+                ExecLP, file, NULL, file, __VA_ARGS__);                                            \
+        }                                                                                          \
     }                                                                                              \
     {                                                                                              \
         /* ExecLE */                                                                               \
@@ -227,16 +229,20 @@ FEXECVE_CALL_IMPL()
             ExecV, path, NULL, path, __VA_ARGS__);                                                 \
     }                                                                                              \
     {                                                                                              \
-        /* ExecVP */                                                                               \
-        runExecTest(testName, expectedReturnValueP, expectedErrnoP,                                \
-            expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                     \
-            ExecVP, file, NULL, file, __VA_ARGS__);                                                \
+        if (file != NULL) {                                                                        \
+            /* ExecVP */                                                                           \
+            runExecTest(testName, expectedReturnValueP, expectedErrnoP,                            \
+                expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                 \
+                ExecVP, file, NULL, file, __VA_ARGS__);                                            \
+        }                                                                                          \
     }                                                                                              \
     {                                                                                              \
-        /* ExecVPE */                                                                              \
-        runExecTest(testName, expectedReturnValueP, expectedErrnoP,                                \
-            expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                     \
-            ExecVPE, file, envp, file, __VA_ARGS__);                                               \
+        if (file != NULL) {                                                                        \
+            /* ExecVPE */                                                                          \
+            runExecTest(testName, expectedReturnValueP, expectedErrnoP,                            \
+                expectedExitCodeP, expectedOutputRegexP, expectedOutputRegexFlags,                 \
+                ExecVPE, file, envp, file, __VA_ARGS__);                                           \
+        }                                                                                          \
     }                                                                                              \
                                                                                                    \
                                                                                                    \
