@@ -24,7 +24,6 @@ esac
 
 termux_exec__ld_preload_lib__log() { local log_level="${1}"; shift; if [ "$TERMUX_EXEC__LD_PRELOAD_LIB__LOG_LEVEL" -ge "$log_level" ]; then echo "@TERMUX__LNAME@-exec:" "$@"; fi }
 termux_exec__ld_preload_lib__log_error() { echo "@TERMUX__LNAME@-exec:" "$@" 1>&2; }
-termux_exec__ld_preload_lib__log_error_for_level() { local log_level="${1}"; shift; if [ "$TERMUX_EXEC__LD_PRELOAD_LIB__LOG_LEVEL" -ge "$log_level" ]; then echo "@TERMUX__LNAME@-exec:" "$@" 1>&2; fi }
 
 
 
