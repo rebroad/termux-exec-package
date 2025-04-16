@@ -241,9 +241,9 @@ termux_exec__libtermux_exec__nos__c__tests__run_command() {
     termux_exec__tests__log 1 "Running 'libtermux-exec_nos_c_tre_tests'"
 
     (
-        # shellcheck source=lib/termux-exec_nos_c_tre/tests/libtermux-exec_nos_c_tre_tests.in
+        # shellcheck source=lib/termux-exec_nos_c/tre/tests/libtermux-exec_nos_c_tre_tests.in
         termux_exec__tests__source_file_from_path \
-            "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c_tre/libtermux-exec_nos_c_tre_tests" || exit $?
+            "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c/tre/libtermux-exec_nos_c_tre_tests" || exit $?
 
         libtermux_exec__nos__c__tests__main
     )

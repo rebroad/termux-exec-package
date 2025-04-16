@@ -1,7 +1,7 @@
 #include <termux/termux_core__nos__c/v1/android/shell/command/environment/AndroidShellEnvironment.h>
 #include <termux/termux_core__nos__c/v1/unix/file/UnixFileUtils.h>
 
-#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecVariantsIntercept.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/direct/exec/ExecVariantsIntercept.h>
 
 
 
@@ -488,7 +488,7 @@ void test__execIntercept__Files(const char* termuxExec_tests_testsPath, const ch
 
     char* termuxExec__execTestFilesPath = NULL;
     asprintf_wrapper(&termuxExec__execTestFilesPath, "%s/%s",
-        termuxExec_tests_testsPath, "lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files");
+        termuxExec_tests_testsPath, "lib/termux-exec_nos_c/tre/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/files");
 
 
     // execlp(), execvp() and execvpe() search for file to be executed in $PATH,

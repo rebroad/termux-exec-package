@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecIntercept.h>
-#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecVariantsIntercept.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/direct/exec/ExecIntercept.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/direct/exec/ExecVariantsIntercept.h>
 #include <termux/termux_exec__nos__c/v1/termux/os/process/termux_exec/TermuxExecProcess.h>
 
 /**

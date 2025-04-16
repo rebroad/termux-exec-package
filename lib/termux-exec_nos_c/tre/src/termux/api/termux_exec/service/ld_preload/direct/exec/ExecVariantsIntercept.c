@@ -39,8 +39,8 @@
 
 #include <termux/termux_core__nos__c/v1/logger/Logger.h>
 
-#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecIntercept.h>
-#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/direct/exec/ExecVariantsIntercept.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/direct/exec/ExecIntercept.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/direct/exec/ExecVariantsIntercept.h>
 
 static const char* LOG_TAG = "exec";
 

@@ -19,7 +19,7 @@
 #include <termux/termux_core__nos__c/v1/unix/os/selinux/UnixSeLinuxUtils.h>
 
 #include <termux/termux_exec__nos__c/v1/TermuxExecLibraryConfig.h>
-#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/ld_preload/TermuxExecLDPreload.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/TermuxExecLDPreload.h>
 #include <termux/termux_exec__nos__c/v1/termux/shell/command/environment/termux_exec/TermuxExecShellEnvironment.h>
 
 static const char* LOG_TAG = "ld-preload";

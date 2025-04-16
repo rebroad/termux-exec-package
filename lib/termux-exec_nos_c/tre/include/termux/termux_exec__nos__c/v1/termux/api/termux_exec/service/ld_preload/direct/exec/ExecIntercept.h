@@ -85,22 +85,22 @@ extern "C" {
  * path.
  *
  * ```
- * LD_DEBUG=3 /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-binary arg1; echo $?
+ * LD_DEBUG=3 /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c/tre/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/files/print-args-binary arg1; echo $?
  * 1
  *
  * # Logcat
  * linker W  [ android linker & debugger ]
- * linker D  DEBUG: library name "/data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-binary" too long
+ * linker D  DEBUG: library name "/data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c/tre/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/files/print-args-binary" too long
  * ```
  *
  * ```
- * (exec -a print-args-binary /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files/print-args-binary arg1); echo $?
+ * (exec -a print-args-binary /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c/tre/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/files/print-args-binary arg1); echo $?
  * arg1
  * 0
  * ```
  *
  * ```
- * (cd /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/files && ./print-args-binary arg1); echo $?
+ * (cd /data/data/com.termux/files/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c/tre/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/files && ./print-args-binary arg1); echo $?
  * arg1
  * 0
  * ```
@@ -110,7 +110,7 @@ extern "C" {
  * - https://github.com/termux/termux-app/issues/213
  *
  * See also `TERMUX__PREFIX__BIN_FILE___SAFE_MAX_LEN` in
- * https://github.com/termux/termux-core-package/blob/master/lib/termux-core_nos_c_tre/include/termux/termux_core__nos__c/v1/termux/file/TermuxFile.h
+ * https://github.com/termux/termux-core-package/blob/master/lib/termux-core_nos_c/tre/include/termux/termux_core__nos__c/v1/termux/file/TermuxFile.h
  *
  * **See Also:**
  * - https://github.com/termux/termux-packages/wiki/Termux-file-system-layout#file-path-limits

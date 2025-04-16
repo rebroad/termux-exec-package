@@ -30,9 +30,9 @@ libtermux_exec__nos__c__runtime_script_tests__run_tests() {
 
 
     (
-        # shellcheck source=lib/termux-exec_nos_c_tre/tests/scripts/termux/api/termux_exec/ld_preload/direct/exec/exec-intercept_runtime-script-tests.in
+        # shellcheck source=lib/termux-exec_nos_c/tre/tests/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/exec-intercept_runtime-script-tests.in
         termux_exec__tests__source_file_from_path \
-            "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c_tre/scripts/termux/api/termux_exec/ld_preload/direct/exec/exec-intercept_runtime-script-tests" || exit $?
+            "$TERMUX_EXEC__TESTS__TESTS_PATH/lib/termux-exec_nos_c/tre/scripts/termux/api/termux_exec/service/ld_preload/direct/exec/exec-intercept_runtime-script-tests" || exit $?
         ExecIntercept_runTests || exit $?
     ) || return $?
 

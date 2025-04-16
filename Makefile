@@ -192,19 +192,19 @@ FSANTIZE_FLAGS += -fsanitize=address -fsanitize-recover=address -fno-omit-frame-
 
 
 override LIBTERMUX_EXEC__NOS__C__SOURCE_FILES := \
-	lib/termux-exec_nos_c_tre/src/TermuxExecLibraryConfig.c \
-	lib/termux-exec_nos_c_tre/src/termux/api/termux_exec/ld_preload/TermuxExecLDPreload.c \
-	lib/termux-exec_nos_c_tre/src/termux/api/termux_exec/ld_preload/direct/exec/ExecIntercept.c \
-	lib/termux-exec_nos_c_tre/src/termux/api/termux_exec/ld_preload/direct/exec/ExecVariantsIntercept.c \
-	lib/termux-exec_nos_c_tre/src/termux/os/process/termux_exec/TermuxExecProcess.c \
-	lib/termux-exec_nos_c_tre/src/termux/shell/command/environment/termux_exec/TermuxExecShellEnvironment.c
+	lib/termux-exec_nos_c/tre/src/TermuxExecLibraryConfig.c \
+	lib/termux-exec_nos_c/tre/src/termux/api/termux_exec/service/ld_preload/TermuxExecLDPreload.c \
+	lib/termux-exec_nos_c/tre/src/termux/api/termux_exec/service/ld_preload/direct/exec/ExecIntercept.c \
+	lib/termux-exec_nos_c/tre/src/termux/api/termux_exec/service/ld_preload/direct/exec/ExecVariantsIntercept.c \
+	lib/termux-exec_nos_c/tre/src/termux/os/process/termux_exec/TermuxExecProcess.c \
+	lib/termux-exec_nos_c/tre/src/termux/shell/command/environment/termux_exec/TermuxExecShellEnvironment.c
 
 override LIBTERMUX_EXEC__NOS__C__OBJECT_FILES := $(patsubst lib/%.c,$(TMP_BUILD_OUTPUT_DIR)/lib/%.o,$(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES))
 
 override LIBTERMUX_EXEC__NOS__C__CPPFLAGS := \
-	$(CPPFLAGS) -I "$(TERMUX__PREFIX)/include/termux-core" -I "lib/termux-exec_nos_c_tre/include"
+	$(CPPFLAGS) -I "$(TERMUX__PREFIX)/include/termux-core" -I "lib/termux-exec_nos_c/tre/include"
 
-override LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR := $(TESTS_BUILD_OUTPUT_DIR)/lib/termux-exec_nos_c_tre
+override LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR := $(TESTS_BUILD_OUTPUT_DIR)/lib/termux-exec_nos_c/tre
 
 
 ifneq ($(LIBTERMUX_EXEC__NOS__C__EXECVE_CALL__CHECK_ARGV0_BUFFER_OVERFLOW),1)
@@ -290,7 +290,7 @@ build-libtermux-exec_nos_c_tre:
 	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre"
 	@mkdir -p $(LIB_BUILD_OUTPUT_DIR)
 
-	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/lib/*.o"
+	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/lib/*.o"
 	for source_file in $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES); do \
 		mkdir -p "$$(dirname "$(TMP_BUILD_OUTPUT_DIR)/$$source_file")" || exit $$?; \
 		$(CC) -c $(CFLAGS) $(LIBTERMUX_EXEC__NOS__C__CPPFLAGS) \
@@ -316,71 +316,71 @@ build-libtermux-exec_nos_c_tre:
 
 
 
-	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/tests/*"
+	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/tests/*"
 	@mkdir -p $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)
 
 
-	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/tests/libtermux-exec_nos_c_tre_tests"
-	$(call replace-termux-constants,lib/termux-exec_nos_c_tre/tests/libtermux-exec_nos_c_tre_tests,$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR))
+	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/tests/libtermux-exec_nos_c_tre_tests"
+	$(call replace-termux-constants,lib/termux-exec_nos_c/tre/tests/libtermux-exec_nos_c_tre_tests,$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR))
 	chmod 700 $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/libtermux-exec_nos_c_tre_tests
 
 
-	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/tests/bin/libtermux-exec_nos_c_tre_unit-binary-tests"
+	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/tests/bin/libtermux-exec_nos_c_tre_unit-binary-tests"
 	@mkdir -p $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin
 
-	@# `nm --demangle --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/bin/libtermux-exec_nos_c_tre_unit-binary-tests-fsanitize`
+	@# `nm --demangle --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c/tre/bin/libtermux-exec_nos_c_tre_unit-binary-tests-fsanitize`
 	$(TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND) -O0 -g \
 		$(FSANTIZE_FLAGS) \
 		-o $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin/libtermux-exec_nos_c_tre_unit-binary-tests-fsanitize \
-		lib/termux-exec_nos_c_tre/tests/src/libtermux-exec_nos_c_tre_unit-binary-tests.c \
+		lib/termux-exec_nos_c/tre/tests/src/libtermux-exec_nos_c_tre_unit-binary-tests.c \
 		$(TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS)
 
-	@# `nm --demangle --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c_tre/bin/libtermux-exec_nos_c_tre_unit-binary-tests-nofsanitize`
+	@# `nm --demangle --defined-only --extern-only /home/builder/.termux-build/termux-exec/src/build/output/usr/libexec/installed-tests/termux-exec/lib/termux-exec_nos_c/tre/bin/libtermux-exec_nos_c_tre_unit-binary-tests-nofsanitize`
 	$(TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND) -O0 -g \
 		-o $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin/libtermux-exec_nos_c_tre_unit-binary-tests-nofsanitize \
-		lib/termux-exec_nos_c_tre/tests/src/libtermux-exec_nos_c_tre_unit-binary-tests.c \
+		lib/termux-exec_nos_c/tre/tests/src/libtermux-exec_nos_c_tre_unit-binary-tests.c \
 		$(TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS)
 
 
-	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/tests/bin/libtermux-exec_nos_c_tre_runtime-binary-tests$(TERMUX_EXEC_PKG__TESTS__API_LEVEL)"
+	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/tests/bin/libtermux-exec_nos_c_tre_runtime-binary-tests$(TERMUX_EXEC_PKG__TESTS__API_LEVEL)"
 	@mkdir -p $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin
 
 	$(TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND) -O0 -g \
 		$(FSANTIZE_FLAGS) \
 		-o $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin/libtermux-exec_nos_c_tre_runtime-binary-tests-fsanitize$(TERMUX_EXEC_PKG__TESTS__API_LEVEL) \
-		lib/termux-exec_nos_c_tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
+		lib/termux-exec_nos_c/tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
 		$(TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS)
 	$(TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND) -O0 -g \
 		-o $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin/libtermux-exec_nos_c_tre_runtime-binary-tests-nofsanitize$(TERMUX_EXEC_PKG__TESTS__API_LEVEL) \
-		lib/termux-exec_nos_c_tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
+		lib/termux-exec_nos_c/tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
 		$(TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS)
 
 
-	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/tests/scripts/*"
+	@printf "\ntermux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/tests/scripts/*"
 	@mkdir -p $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts
-	find lib/termux-exec_nos_c_tre/tests/scripts -type f -name '*.c' -print0 | xargs -0 -n1 sh -c \
-		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c_tre/tests/scripts/||" -e "s/\.c$$//")" && mkdir -p "$$(dirname "$$output_file")" && $(CC) $(CFLAGS) -O0 -fPIE -pie $(LDFLAGS) -g "$$0" -o "$$output_file"'
-	find lib/termux-exec_nos_c_tre/tests/scripts -type f -name '*.sh' -print0 | xargs -0 -n1 sh -c \
-		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c_tre/tests/scripts/||")" && mkdir -p "$$(dirname "$$output_file")" && cp -a "$$0" "$$output_file"'
-	find lib/termux-exec_nos_c_tre/tests/scripts -type f -name "*.in" -print0 | xargs -0 -n1 sh -c \
-		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c_tre/tests/scripts/||" -e "s/\.in$$//")" && mkdir -p "$$(dirname "$$output_file")" && sed $(TERMUX__CONSTANTS__SED_ARGS) "$$0" > "$$output_file"'
-	find lib/termux-exec_nos_c_tre/tests/scripts -type l -print0 | xargs -0 -n1 sh -c \
-		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c_tre/tests/scripts/||")" && mkdir -p "$$(dirname "$$output_file")" && cp -a "$$0" "$$output_file"'
+	find lib/termux-exec_nos_c/tre/tests/scripts -type f -name '*.c' -print0 | xargs -0 -n1 sh -c \
+		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c/tre/tests/scripts/||" -e "s/\.c$$//")" && mkdir -p "$$(dirname "$$output_file")" && $(CC) $(CFLAGS) -O0 -fPIE -pie $(LDFLAGS) -g "$$0" -o "$$output_file"'
+	find lib/termux-exec_nos_c/tre/tests/scripts -type f -name '*.sh' -print0 | xargs -0 -n1 sh -c \
+		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c/tre/tests/scripts/||")" && mkdir -p "$$(dirname "$$output_file")" && cp -a "$$0" "$$output_file"'
+	find lib/termux-exec_nos_c/tre/tests/scripts -type f -name "*.in" -print0 | xargs -0 -n1 sh -c \
+		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c/tre/tests/scripts/||" -e "s/\.in$$//")" && mkdir -p "$$(dirname "$$output_file")" && sed $(TERMUX__CONSTANTS__SED_ARGS) "$$0" > "$$output_file"'
+	find lib/termux-exec_nos_c/tre/tests/scripts -type l -print0 | xargs -0 -n1 sh -c \
+		'output_file="$(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts/$$(printf "%s" "$$0" | sed -e "s|^lib/termux-exec_nos_c/tre/tests/scripts/||")" && mkdir -p "$$(dirname "$$output_file")" && cp -a "$$0" "$$output_file"'
 	find $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/scripts -type f -exec chmod 700 "{}" \;
 
 
 build-libtermux-exec_nos_c_tre_runtime-binary-tests:
-	@printf "termux-exec-package: %s\n" "Building lib/termux-exec_nos_c_tre/tests/bin/libtermux-exec_nos_c_tre_runtime-binary-tests$(TERMUX_EXEC_PKG__TESTS__API_LEVEL)"
+	@printf "termux-exec-package: %s\n" "Building lib/termux-exec_nos_c/tre/tests/bin/libtermux-exec_nos_c_tre_runtime-binary-tests$(TERMUX_EXEC_PKG__TESTS__API_LEVEL)"
 	@mkdir -p $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin
 
 	$(TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND) -O0 -g \
 		$(FSANTIZE_FLAGS) \
 		-o $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin/libtermux-exec_nos_c_tre_runtime-binary-tests-fsanitize$(TERMUX_EXEC_PKG__TESTS__API_LEVEL) \
-		lib/termux-exec_nos_c_tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
+		lib/termux-exec_nos_c/tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
 		$(TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS)
 	$(TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND) -O0 -g \
 		-o $(LIBTERMUX_EXEC__NOS__C__TESTS_BUILD_OUTPUT_DIR)/bin/libtermux-exec_nos_c_tre_runtime-binary-tests-nofsanitize$(TERMUX_EXEC_PKG__TESTS__API_LEVEL) \
-		lib/termux-exec_nos_c_tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
+		lib/termux-exec_nos_c/tre/tests/src/libtermux-exec_nos_c_tre_runtime-binary-tests.c \
 		$(TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS)
 
 build-libtermux-exec-direct-ld-preload:
@@ -398,7 +398,7 @@ build-libtermux-exec-direct-ld-preload:
 		$(TERMUX__CONSTANTS__MACRO_FLAGS) \
 		-fPIC -shared -fvisibility=hidden \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-direct-ld-preload.so \
-		app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c \
+		app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/service/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c \
 		-l:libtermux-exec_nos_c_tre.a -l:libtermux-core_nos_c_tre.a
 
 	@# By default, set `libtermux-exec-direct-ld-preload.so` as the
@@ -434,7 +434,7 @@ build-libtermux-exec-linker-ld-preload:
 		$(TERMUX__CONSTANTS__MACRO_FLAGS) \
 		-fPIC -shared -fvisibility=hidden \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-linker-ld-preload.so \
-		app/termux-exec-linker-ld-preload/src/termux/api/termux_exec/ld_preload/linker/TermuxExecLinkerLDPreloadEntryPoint.c \
+		app/termux-exec-linker-ld-preload/src/termux/api/termux_exec/service/ld_preload/linker/TermuxExecLinkerLDPreloadEntryPoint.c \
 		-l:libtermux-exec_nos_c_tre.a -l:libtermux-core_nos_c_tre.a
 
 
@@ -455,7 +455,7 @@ install:
 	rm -rf $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec
 	install -d $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec/termux
 
-	cp -a lib/termux-exec_nos_c_tre/include/termux/termux_exec__nos__c $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec/termux/termux_exec__nos__c
+	cp -a lib/termux-exec_nos_c/tre/include/termux/termux_exec__nos__c $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/include/termux-exec/termux/termux_exec__nos__c
 	install $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec_nos_c_tre.so $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec_nos_c_tre.so
 	install $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec_nos_c_tre.a $(TERMUX_EXEC_PKG__INSTALL_PREFIX)/lib/libtermux-exec_nos_c_tre.a
 
@@ -533,11 +533,11 @@ test-runtime: all
 
 
 format:
-	$(CLANG_FORMAT) -i app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES)
+	$(CLANG_FORMAT) -i app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/service/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES)
 check:
-	$(CLANG_FORMAT) --dry-run app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES)
+	$(CLANG_FORMAT) --dry-run app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/service/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES)
 	$(CLANG_TIDY) -warnings-as-errors='*' \
-		app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES) -- \
+		app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/service/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c $(LIBTERMUX_EXEC__NOS__C__SOURCE_FILES) -- \
 		$(LIBTERMUX_EXEC__NOS__C__CPPFLAGS) \
 		$(TERMUX__CONSTANTS__MACRO_FLAGS)
 

@@ -48,7 +48,7 @@ static void runTests();
 
 
 
-#include "termux/api/termux_exec/ld_preload/direct/exec/ExecIntercept_RuntimeBinaryTests.c"
+#include "termux/api/termux_exec/service/ld_preload/direct/exec/ExecIntercept_RuntimeBinaryTests.c"
 
 
 
