@@ -99,6 +99,16 @@ static const int ENV_DEF_VAL__TERMUX_EXEC__SYSTEM_LINKER_EXEC__MODE = 1;
 
 
 
+/**
+ * Environment variable for overriding the user hostname config file path.
+ *
+ * This is primarily for tests. Runtime configuration should normally use
+ * `$TERMUX__PREFIX/etc/termux/hostname`.
+ */
+#define ENV__TERMUX_EXEC__HOSTNAME_FILE TERMUX_ENV__S_TERMUX_EXEC "HOSTNAME_FILE"
+
+
+
 
 
 /*

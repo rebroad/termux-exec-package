@@ -2,6 +2,7 @@
 #define LIBTERMUX_EXEC__NOS__C__TERMUX_EXEC_LD_PRELOAD___H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,6 +83,24 @@ int isSystemLinkerExecEnabled();
  * otherwise `-1` on failures.
  */
 int shouldEnableSystemLinkerExecForFile(const char *executablePath);
+
+/**
+ * Read the configured Termux hostname.
+ *
+ * The default config path is `$TERMUX__PREFIX/etc/termux/hostname`. Tests may
+ * override it with `TERMUX_EXEC__HOSTNAME_FILE`.
+ *
+ * @return Returns `0` if a configured hostname was read, `1` if there is no
+ * usable configured hostname, otherwise `-1` on failures.
+ */
+int termuxExec_getConfiguredHostname(char *buffer, size_t bufferSize);
+
+/**
+ * Intercept `gethostname()` for dynamically linked Termux processes.
+ *
+ * If no configured hostname exists, this falls back to the host syscall.
+ */
+int gethostnameIntercept(char *name, size_t len);
 
 
 

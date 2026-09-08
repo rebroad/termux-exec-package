@@ -15,10 +15,25 @@ main() {
     # Run after the package is installed: `postinst configure <old-version>`
     # - https://manpages.debian.org/testing/dpkg-dev/deb-postinst.5.en.html#postinst
     if [ "$1" = "configure" ]; then
+        create_default_hostname_file || return $?
         set_primary_termux_ld_preload_library || return $?
     fi
 
     log "End"
+
+}
+
+create_default_hostname_file() {
+
+    local hostname_file="@TERMUX__PREFIX@/etc/termux/hostname"
+
+    if [ -e "$hostname_file" ]; then
+        return 0
+    fi
+
+    log "Creating default Termux hostname file"
+    mkdir -p "$(dirname "$hostname_file")" || return $?
+    printf "%s\n" "termux" > "$hostname_file" || return $?
 
 }
 

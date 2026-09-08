@@ -36,6 +36,7 @@ The `termux-exec` uses the following environment variables as input if required.
 - [`TERMUX__SE_PROCESS_CONTEXT`](#termux__se_process_context)
 - [`TERMUX_EXEC__LOG_LEVEL`](#termux_exec__log_level)
 - [`TERMUX_EXEC__EXECVE_CALL__INTERCEPT`](#termux_exec__execve_call__intercept)
+- [`TERMUX_EXEC__HOSTNAME_FILE`](#termux_exec__hostname_file)
 - [`TERMUX_EXEC__SYSTEM_LINKER_EXEC__MODE`](#termux_exec__system_linker_exec__mode)
 - [`TERMUX_EXEC__TESTS__LOG_LEVEL`](#termux_exec__tests__log_level)
 
@@ -148,6 +149,29 @@ The `REGEX__PROCESS_CONTEXT` is defined in [`SelinuxUtils.h`](https://github.com
 
 - [Security Context](https://github.com/agnostic-apollo/Android-Docs/blob/master/site/pages/en/projects/docs/os/selinux/security-context.md)
 - [`untrusted_app` process context type](https://github.com/agnostic-apollo/Android-Docs/blob/master/site/pages/en/projects/docs/os/selinux/context-types.md#untrusted_app)
+
+## &nbsp;
+
+&nbsp;
+
+
+
+### TERMUX_EXEC__HOSTNAME_FILE
+
+Path to the user hostname config file read by the `termux-exec` `$LD_PRELOAD` library. If unset, the library reads `$TERMUX__PREFIX/etc/termux/hostname`.
+
+When this file contains a non-empty first line, dynamically linked programs launched under Termux and calling `gethostname()` will see that value. The `hostname` command uses the same dynamically linked process path. The package creates `$TERMUX__PREFIX/etc/termux/hostname` with `termux` on first install if the file does not already exist.
+
+**Type:** `string`
+
+**Default value:** `$TERMUX__PREFIX/etc/termux/hostname`
+
+**Assigned values:**
+
+- An absolute path to a readable file.
+- The first line should contain the hostname without leading or trailing shell syntax.
+
+Changes apply to newly started dynamically linked processes after `$LD_PRELOAD` has loaded `libtermux-exec-ld-preload.so`.
 
 ## &nbsp;
 

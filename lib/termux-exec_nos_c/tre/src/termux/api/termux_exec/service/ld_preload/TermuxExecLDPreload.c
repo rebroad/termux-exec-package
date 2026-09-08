@@ -26,6 +26,8 @@ static const char* LOG_TAG = "ld-preload";
 
 static int sSystemLinkerExecEnabled = -1;
 
+#define TERMUX_EXEC__HOSTNAME_FILE_PATH TERMUX__PREFIX "/etc/termux/hostname"
+
 
 
 int isSystemLinkerExecEnabled() {
@@ -167,4 +169,75 @@ int shouldEnableSystemLinkerExecForFile(const char *executablePath) {
     }
 
     return shouldEnableSystemLinkerExec ? 0 : 1;
+}
+
+int termuxExec_getConfiguredHostname(char *buffer, size_t bufferSize) {
+    if (buffer == NULL || bufferSize == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    const char *hostnameFilePath = getenv(ENV__TERMUX_EXEC__HOSTNAME_FILE);
+    if (hostnameFilePath == NULL || strlen(hostnameFilePath) < 1) {
+        hostnameFilePath = TERMUX_EXEC__HOSTNAME_FILE_PATH;
+    }
+
+    FILE *file = fopen(hostnameFilePath, "r");
+    if (file == NULL) {
+        if (errno == ENOENT) {
+            errno = 0;
+            return 1;
+        }
+        return -1;
+    }
+
+    char hostname[HOST_NAME_MAX + 2];
+    if (fgets(hostname, sizeof(hostname), file) == NULL) {
+        int savedErrno = errno;
+        fclose(file);
+        errno = savedErrno;
+        if (errno == 0) {
+            return 1;
+        }
+        return -1;
+    }
+
+    int closeResult = fclose(file);
+    if (closeResult != 0) {
+        return -1;
+    }
+
+    hostname[strcspn(hostname, "\r\n")] = '\0';
+    size_t hostnameLength = strlen(hostname);
+    if (hostnameLength < 1) {
+        return 1;
+    }
+
+    if (hostnameLength >= bufferSize) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    memcpy(buffer, hostname, hostnameLength + 1);
+    return 0;
+}
+
+int gethostnameIntercept(char *name, size_t len) {
+    int savedErrno = errno;
+    int configuredHostnameResult = termuxExec_getConfiguredHostname(name, len);
+    if (configuredHostnameResult == 0) {
+        errno = savedErrno;
+        return 0;
+    }
+    if (configuredHostnameResult < 0) {
+        return -1;
+    }
+
+    errno = savedErrno;
+#ifdef SYS_gethostname
+    return (int) syscall(SYS_gethostname, name, len);
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
 }
