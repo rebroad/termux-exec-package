@@ -2,6 +2,7 @@ export TERMUX_EXEC_PKG__VERSION := 2.5.0
 export TERMUX_EXEC_PKG__ARCH
 export TERMUX_EXEC_PKG__INSTALL_PREFIX
 export TERMUX_EXEC_PKG__TESTS__API_LEVEL :=
+export TERMUX_CORE_PKG__LIBRARY_FILE := libtermux-core_nos_c_tre.a
 
 export TERMUX__NAME := Termux# Default value: `Termux`
 export TERMUX__LNAME := termux# Default value: `termux`
@@ -237,7 +238,7 @@ override TERMUX_EXEC_EXECUTABLE__C__BUILD_COMMAND := \
 # The `-l` flags must be passed after object files for proper linking.
 # The order of libraries matters too and any dependencies of a library
 # must come after it.
-override TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS := -l:libtermux-exec_nos_c_tre.a -l:libtermux-core_nos_c_tre.a
+override TERMUX_EXEC_EXECUTABLE__C__POST_LDFLAGS := -l:libtermux-exec_nos_c_tre.a -l:$(TERMUX_CORE_PKG__LIBRARY_FILE)
 
 
 CLANG_FORMAT := clang-format --sort-includes --style="{ColumnLimit: 120}"
@@ -309,7 +310,7 @@ build-libtermux-exec_nos_c_tre:
 		-fPIC -shared -fvisibility=default \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec_nos_c_tre.so \
 		$(LIBTERMUX_EXEC__NOS__C__OBJECT_FILES) \
-		-l:libtermux-core_nos_c_tre.a
+		-l:$(TERMUX_CORE_PKG__LIBRARY_FILE)
 
 	@printf "\ntermux-exec-package: %s\n" "Building lib/libtermux-exec_nos_c_tre.a"
 	$(AR) rcs $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec_nos_c_tre.a $(LIBTERMUX_EXEC__NOS__C__OBJECT_FILES)
@@ -399,7 +400,7 @@ build-libtermux-exec-direct-ld-preload:
 		-fPIC -shared -fvisibility=hidden \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-direct-ld-preload.so \
 		app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/service/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c \
-		-l:libtermux-exec_nos_c_tre.a -l:libtermux-core_nos_c_tre.a
+		-l:libtermux-exec_nos_c_tre.a -l:$(TERMUX_CORE_PKG__LIBRARY_FILE) -ldl
 
 	@# By default, set `libtermux-exec-direct-ld-preload.so` as the
 	@# primary library variant exported in `$LD_PRELOAD` by copying it
@@ -435,7 +436,7 @@ build-libtermux-exec-linker-ld-preload:
 		-fPIC -shared -fvisibility=hidden \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-linker-ld-preload.so \
 		app/termux-exec-linker-ld-preload/src/termux/api/termux_exec/service/ld_preload/linker/TermuxExecLinkerLDPreloadEntryPoint.c \
-		-l:libtermux-exec_nos_c_tre.a -l:libtermux-core_nos_c_tre.a
+		-l:libtermux-exec_nos_c_tre.a -l:$(TERMUX_CORE_PKG__LIBRARY_FILE) -ldl
 
 
 

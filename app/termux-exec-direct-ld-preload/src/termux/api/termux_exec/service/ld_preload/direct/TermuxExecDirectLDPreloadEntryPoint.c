@@ -105,3 +105,15 @@ int gethostname(char *name, size_t len) {
 
     return gethostnameIntercept(name, len);
 }
+
+__attribute__((visibility("default")))
+struct passwd *getpwuid(uid_t uid) {
+    termuxExec_directLdPreload_initProcess();
+    return getpwuidIntercept(uid);
+}
+
+__attribute__((visibility("default")))
+struct passwd *getpwnam(const char *name) {
+    termuxExec_directLdPreload_initProcess();
+    return getpwnamIntercept(name);
+}

@@ -39,6 +39,7 @@ static void runTests();
 #include "termux/api/termux_exec/service/ld_preload/direct/exec/ExecIntercept_UnitBinaryTests.c"
 
 static void test__getConfiguredHostname();
+static void test__getConfiguredPasswd();
 
 
 
@@ -78,6 +79,7 @@ void runTests() {
 
     ExecIntercept_runTests();
     test__getConfiguredHostname();
+    test__getConfiguredPasswd();
 
     logDebug(LOG_TAG, "runTests(end)");
 
@@ -88,8 +90,7 @@ static void test__getConfiguredHostname() {
 
     char template[PATH_MAX];
 #ifdef __ANDROID__
-    const char *tmpDir = getenv("TMPDIR");
-    if (tmpDir == NULL || strlen(tmpDir) < 1) tmpDir = TERMUX__PREFIX "/tmp";
+    const char *tmpDir = TERMUX__PREFIX "/tmp";
 #else
     const char *tmpDir = "/var/tmp";
 #endif
@@ -120,5 +121,44 @@ static void test__getConfiguredHostname() {
 
     int__AEqual(0, unlink(template));
     int__AEqual(0, unsetenv(ENV__TERMUX_EXEC__HOSTNAME_FILE));
+    errno = 0;
+}
+
+static void test__getConfiguredPasswd() {
+    logVerbose(LOG_TAG, "test__getConfiguredPasswd()");
+
+    char template[PATH_MAX];
+#ifdef __ANDROID__
+    const char *tmpDir = TERMUX__PREFIX "/tmp";
+#else
+    const char *tmpDir = "/var/tmp";
+#endif
+    int__AEqual(0, mkdir(tmpDir, 0700) == 0 || errno == EEXIST ? 0 : -1);
+    snprintf(template, sizeof(template), "%s/termux-exec-passwd-test.XXXXXX", tmpDir) < 0 ? abort() : (void)0;
+    int fd = mkstemp(template);
+    state__ATrue(fd >= 0);
+
+    const char *passwd = "testuser:x:12345:12345:Test User:/data/data/com.termux/files/home:/data/data/com.termux/files/usr/bin/bash\n";
+    ssize_t bytesWritten = write(fd, passwd, strlen(passwd));
+    int__AEqual((int) strlen(passwd), (int) bytesWritten);
+    int__AEqual(0, close(fd));
+
+    int__AEqual(0, setenv(ENV__TERMUX_EXEC__PASSWD_FILE, template, 1));
+
+    struct passwd entry;
+    int__AEqual(0, termuxExec_getConfiguredPasswdEntry(12345, NULL, &entry));
+    string__AEqual("testuser", entry.pw_name);
+    string__AEqual("/data/data/com.termux/files/home", entry.pw_dir);
+    int__AEqual(12345, (int) entry.pw_uid);
+
+    struct passwd *lookup = getpwuidIntercept(12345);
+    state__ATrue(lookup != NULL);
+    string__AEqual("testuser", lookup->pw_name);
+    lookup = getpwnamIntercept("testuser");
+    state__ATrue(lookup != NULL);
+    int__AEqual(12345, (int) lookup->pw_uid);
+
+    int__AEqual(0, unlink(template));
+    int__AEqual(0, unsetenv(ENV__TERMUX_EXEC__PASSWD_FILE));
     errno = 0;
 }

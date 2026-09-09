@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <pwd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,6 +102,15 @@ int termuxExec_getConfiguredHostname(char *buffer, size_t bufferSize);
  * If no configured hostname exists, this falls back to the host syscall.
  */
 int gethostnameIntercept(char *name, size_t len);
+
+/**
+ * Resolve a configured Termux passwd entry, returning `1` when none matches.
+ */
+int termuxExec_getConfiguredPasswdEntry(uid_t uid, const char *name, struct passwd *result);
+
+/** Intercept passwd lookups for dynamically linked Termux processes. */
+struct passwd *getpwuidIntercept(uid_t uid);
+struct passwd *getpwnamIntercept(const char *name);
 
 
 

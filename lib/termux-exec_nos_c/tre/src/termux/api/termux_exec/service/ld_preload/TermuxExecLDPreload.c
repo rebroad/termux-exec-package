@@ -3,11 +3,14 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <dlfcn.h>
 
 #include <sys/syscall.h>
 
@@ -27,6 +30,7 @@ static const char* LOG_TAG = "ld-preload";
 static int sSystemLinkerExecEnabled = -1;
 
 #define TERMUX_EXEC__HOSTNAME_FILE_PATH TERMUX__PREFIX "/etc/termux/hostname"
+#define TERMUX_EXEC__PASSWD_FILE_PATH TERMUX__PREFIX "/etc/passwd"
 
 
 
@@ -240,4 +244,116 @@ int gethostnameIntercept(char *name, size_t len) {
     errno = ENOSYS;
     return -1;
 #endif
+}
+
+static _Thread_local struct passwd sPasswdEntry;
+static _Thread_local char sPasswdLine[4096];
+
+static char *nextPasswdField(char **cursor) {
+    char *field = *cursor;
+    char *separator = strchr(field, ':');
+    if (separator != NULL) {
+        *separator = '\0';
+        *cursor = separator + 1;
+    } else {
+        *cursor = field + strlen(field);
+    }
+    return field;
+}
+
+int termuxExec_getConfiguredPasswdEntry(uid_t uid, const char *name, struct passwd *result) {
+    if (name == NULL && result == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    const char *passwdFilePath = getenv(ENV__TERMUX_EXEC__PASSWD_FILE);
+    if (passwdFilePath == NULL || strlen(passwdFilePath) < 1) {
+        passwdFilePath = TERMUX_EXEC__PASSWD_FILE_PATH;
+    }
+
+    FILE *file = fopen(passwdFilePath, "r");
+    if (file == NULL) {
+        if (errno == ENOENT) {
+            errno = 0;
+            return 1;
+        }
+        return -1;
+    }
+
+    while (fgets(sPasswdLine, sizeof(sPasswdLine), file) != NULL) {
+        sPasswdLine[strcspn(sPasswdLine, "\r\n")] = '\0';
+        if (sPasswdLine[0] == '\0' || sPasswdLine[0] == '#') continue;
+
+        char *cursor = sPasswdLine;
+        char *entryName = nextPasswdField(&cursor);
+        (void) nextPasswdField(&cursor); // password
+        char *uidString = nextPasswdField(&cursor);
+        char *gidString = nextPasswdField(&cursor);
+        char *gecos = nextPasswdField(&cursor);
+        char *home = nextPasswdField(&cursor);
+        char *shell = cursor;
+        char *end = NULL;
+        unsigned long entryUid = strtoul(uidString, &end, 10);
+        if (end == uidString || *end != '\0' || entryUid > UINT_MAX) continue;
+        end = NULL;
+        unsigned long entryGid = strtoul(gidString, &end, 10);
+        if (end == gidString || *end != '\0' || entryGid > UINT_MAX) continue;
+
+        if ((name != NULL && strcmp(name, entryName) != 0) ||
+            (name == NULL && (uid_t) entryUid != uid)) continue;
+
+        sPasswdEntry.pw_name = entryName;
+        sPasswdEntry.pw_passwd = (char *) "x";
+        sPasswdEntry.pw_uid = (uid_t) entryUid;
+        sPasswdEntry.pw_gid = (gid_t) entryGid;
+        sPasswdEntry.pw_gecos = gecos;
+        sPasswdEntry.pw_dir = home;
+        sPasswdEntry.pw_shell = shell;
+        if (result != NULL) *result = sPasswdEntry;
+        fclose(file);
+        return 0;
+    }
+
+    int savedErrno = errno;
+    fclose(file);
+    errno = savedErrno;
+    if (errno == 0) return 1;
+    return -1;
+}
+
+static struct passwd *getpwuidFallback(uid_t uid) {
+    static struct passwd *(*function)(uid_t);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getpwuid");
+    if (function == NULL) {
+        errno = ENOSYS;
+        return NULL;
+    }
+    return function(uid);
+}
+
+static struct passwd *getpwnamFallback(const char *name) {
+    static struct passwd *(*function)(const char *);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getpwnam");
+    if (function == NULL) {
+        errno = ENOSYS;
+        return NULL;
+    }
+    return function(name);
+}
+
+struct passwd *getpwuidIntercept(uid_t uid) {
+    struct passwd result;
+    int configuredResult = termuxExec_getConfiguredPasswdEntry(uid, NULL, &result);
+    if (configuredResult == 0) return &sPasswdEntry;
+    if (configuredResult < 0) return NULL;
+    return getpwuidFallback(uid);
+}
+
+struct passwd *getpwnamIntercept(const char *name) {
+    struct passwd result;
+    int configuredResult = termuxExec_getConfiguredPasswdEntry(0, name, &result);
+    if (configuredResult == 0) return &sPasswdEntry;
+    if (configuredResult < 0) return NULL;
+    return getpwnamFallback(name);
 }
