@@ -71,6 +71,7 @@ export override PREFIX_BUILD_OUTPUT_DIR := $(BUILD_OUTPUT_DIR)/usr# Default valu
 export override BIN_BUILD_OUTPUT_DIR := $(PREFIX_BUILD_OUTPUT_DIR)/bin# Default value: `build/output/usr/bin`
 export override LIB_BUILD_OUTPUT_DIR := $(PREFIX_BUILD_OUTPUT_DIR)/lib# Default value: `build/output/usr/lib`
 export override LIBEXEC_BUILD_OUTPUT_DIR := $(PREFIX_BUILD_OUTPUT_DIR)/libexec# Default value: `build/output/usr/libexec`
+export override TERMUX_EXEC_LD_PRELOAD_SYMBOLS := app/termux-exec-ld-preload-symbols.map
 export override TESTS_BUILD_OUTPUT_DIR := $(LIBEXEC_BUILD_OUTPUT_DIR)/installed-tests/termux-exec# Default value: `build/output/usr/libexec/installed-tests/termux-exec`
 
 export override PACKAGING_BUILD_OUTPUT_DIR := $(BUILD_OUTPUT_DIR)/packaging# Default value: `build/output/packaging`
@@ -398,6 +399,7 @@ build-libtermux-exec-direct-ld-preload:
 		-L$(LIB_BUILD_OUTPUT_DIR) $(LDFLAGS) -Wl,--exclude-libs=ALL \
 		$(TERMUX__CONSTANTS__MACRO_FLAGS) \
 		-fPIC -shared -fvisibility=hidden \
+		-Wl,--version-script=$(TERMUX_EXEC_LD_PRELOAD_SYMBOLS) \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-direct-ld-preload.so \
 		app/termux-exec-direct-ld-preload/src/termux/api/termux_exec/service/ld_preload/direct/TermuxExecDirectLDPreloadEntryPoint.c \
 		-l:libtermux-exec_nos_c_tre.a -l:$(TERMUX_CORE_PKG__LIBRARY_FILE) -ldl
@@ -434,6 +436,7 @@ build-libtermux-exec-linker-ld-preload:
 		-L$(LIB_BUILD_OUTPUT_DIR) $(LDFLAGS) -Wl,--exclude-libs=ALL \
 		$(TERMUX__CONSTANTS__MACRO_FLAGS) \
 		-fPIC -shared -fvisibility=hidden \
+		-Wl,--version-script=$(TERMUX_EXEC_LD_PRELOAD_SYMBOLS) \
 		-o $(LIB_BUILD_OUTPUT_DIR)/libtermux-exec-linker-ld-preload.so \
 		app/termux-exec-linker-ld-preload/src/termux/api/termux_exec/service/ld_preload/linker/TermuxExecLinkerLDPreloadEntryPoint.c \
 		-l:libtermux-exec_nos_c_tre.a -l:$(TERMUX_CORE_PKG__LIBRARY_FILE) -ldl

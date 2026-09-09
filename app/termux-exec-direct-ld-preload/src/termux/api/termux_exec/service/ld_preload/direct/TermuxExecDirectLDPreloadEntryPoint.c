@@ -8,6 +8,15 @@
 #include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/TermuxExecLDPreload.h>
 #include <termux/termux_exec__nos__c/v1/termux/os/process/termux_exec/TermuxExecProcess.h>
 
+#undef getpwuid
+#undef getpwnam
+#undef getpwuid_r
+#undef getpwnam_r
+#undef getgrgid
+#undef getgrnam
+#undef getgrgid_r
+#undef getgrnam_r
+
 /**
  * This file defines functions intercepted by `libtermux-exec-direct-ld-preload.so` using `$LD_PRELOAD`.
  *
@@ -119,6 +128,20 @@ struct passwd *getpwnam(const char *name) {
 }
 
 __attribute__((visibility("default")))
+int getpwuid_r(uid_t uid, struct passwd *result, char *buffer, size_t bufferSize,
+               struct passwd **resultPointer) {
+    termuxExec_directLdPreload_initProcess();
+    return getpwuidRIntercept(uid, result, buffer, bufferSize, resultPointer);
+}
+
+__attribute__((visibility("default")))
+int getpwnam_r(const char *name, struct passwd *result, char *buffer, size_t bufferSize,
+               struct passwd **resultPointer) {
+    termuxExec_directLdPreload_initProcess();
+    return getpwnamRIntercept(name, result, buffer, bufferSize, resultPointer);
+}
+
+__attribute__((visibility("default")))
 struct group *getgrgid(gid_t gid) {
     termuxExec_directLdPreload_initProcess();
     return getgrgidIntercept(gid);
@@ -128,4 +151,18 @@ __attribute__((visibility("default")))
 struct group *getgrnam(const char *name) {
     termuxExec_directLdPreload_initProcess();
     return getgrnamIntercept(name);
+}
+
+__attribute__((visibility("default")))
+int getgrgid_r(gid_t gid, struct group *result, char *buffer, size_t bufferSize,
+               struct group **resultPointer) {
+    termuxExec_directLdPreload_initProcess();
+    return getgrgidRIntercept(gid, result, buffer, bufferSize, resultPointer);
+}
+
+__attribute__((visibility("default")))
+int getgrnam_r(const char *name, struct group *result, char *buffer, size_t bufferSize,
+               struct group **resultPointer) {
+    termuxExec_directLdPreload_initProcess();
+    return getgrnamRIntercept(name, result, buffer, bufferSize, resultPointer);
 }

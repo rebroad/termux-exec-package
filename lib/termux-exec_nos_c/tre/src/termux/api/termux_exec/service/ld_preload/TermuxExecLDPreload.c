@@ -363,6 +363,84 @@ struct passwd *getpwnamIntercept(const char *name) {
     return getpwnamFallback(name);
 }
 
+static int copyPasswdEntry(const struct passwd *source, struct passwd *result, char *buffer,
+                           size_t bufferSize, struct passwd **resultPointer) {
+    size_t needed = strlen(source->pw_name) + 1 + strlen(source->pw_passwd) + 1 +
+                    strlen(source->pw_gecos) + 1 + strlen(source->pw_dir) + 1 +
+                    strlen(source->pw_shell) + 1;
+    if (needed > bufferSize) {
+        *resultPointer = NULL;
+        return ERANGE;
+    }
+
+    char *cursor = buffer;
+#define COPY_PASSWD_FIELD(field) \
+    do { \
+        size_t fieldSize = strlen(source->field) + 1; \
+        memcpy(cursor, source->field, fieldSize); \
+        result->field = cursor; \
+        cursor += fieldSize; \
+    } while (0)
+    COPY_PASSWD_FIELD(pw_name);
+    COPY_PASSWD_FIELD(pw_passwd);
+    result->pw_uid = source->pw_uid;
+    result->pw_gid = source->pw_gid;
+    COPY_PASSWD_FIELD(pw_gecos);
+    COPY_PASSWD_FIELD(pw_dir);
+    COPY_PASSWD_FIELD(pw_shell);
+#undef COPY_PASSWD_FIELD
+    *resultPointer = result;
+    return 0;
+}
+
+static int getpwuidRFallback(uid_t uid, struct passwd *result, char *buffer, size_t bufferSize,
+                             struct passwd **resultPointer) {
+    static int (*function)(uid_t, struct passwd *, char *, size_t, struct passwd **);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getpwuid_r");
+    if (function == NULL) {
+        *resultPointer = NULL;
+        return ENOSYS;
+    }
+    return function(uid, result, buffer, bufferSize, resultPointer);
+}
+
+static int getpwnamRFallback(const char *name, struct passwd *result, char *buffer, size_t bufferSize,
+                             struct passwd **resultPointer) {
+    static int (*function)(const char *, struct passwd *, char *, size_t, struct passwd **);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getpwnam_r");
+    if (function == NULL) {
+        *resultPointer = NULL;
+        return ENOSYS;
+    }
+    return function(name, result, buffer, bufferSize, resultPointer);
+}
+
+int getpwuidRIntercept(uid_t uid, struct passwd *result, char *buffer, size_t bufferSize,
+                       struct passwd **resultPointer) {
+    struct passwd configured;
+    int configuredResult = termuxExec_getConfiguredPasswdEntry(uid, NULL, &configured);
+    if (configuredResult == 0)
+        return copyPasswdEntry(&configured, result, buffer, bufferSize, resultPointer);
+    if (configuredResult < 0) {
+        *resultPointer = NULL;
+        return errno;
+    }
+    return getpwuidRFallback(uid, result, buffer, bufferSize, resultPointer);
+}
+
+int getpwnamRIntercept(const char *name, struct passwd *result, char *buffer, size_t bufferSize,
+                       struct passwd **resultPointer) {
+    struct passwd configured;
+    int configuredResult = termuxExec_getConfiguredPasswdEntry(0, name, &configured);
+    if (configuredResult == 0)
+        return copyPasswdEntry(&configured, result, buffer, bufferSize, resultPointer);
+    if (configuredResult < 0) {
+        *resultPointer = NULL;
+        return errno;
+    }
+    return getpwnamRFallback(name, result, buffer, bufferSize, resultPointer);
+}
+
 static struct group *getgrgidFallback(gid_t gid) {
     static struct group *(*function)(gid_t);
     if (function == NULL) function = dlsym(RTLD_NEXT, "getgrgid");
@@ -460,4 +538,91 @@ struct group *getgrnamIntercept(const char *name) {
     if (configuredResult == 0) return &sGroupEntry;
     if (configuredResult < 0) return NULL;
     return getgrnamFallback(name);
+}
+
+static int copyGroupEntry(const struct group *source, struct group *result, char *buffer,
+                          size_t bufferSize, struct group **resultPointer) {
+    size_t needed = strlen(source->gr_name) + 1 + strlen(source->gr_passwd) + 1;
+    size_t memberCount = 0;
+    while (source->gr_mem != NULL && source->gr_mem[memberCount] != NULL) {
+        needed += strlen(source->gr_mem[memberCount]) + 1;
+        memberCount++;
+    }
+    needed += (memberCount + 1) * sizeof(char *);
+    if (needed > bufferSize) {
+        *resultPointer = NULL;
+        return ERANGE;
+    }
+
+    char *cursor = buffer;
+    size_t stringOffset = (memberCount + 1) * sizeof(char *);
+    char **members = (char **) cursor;
+    cursor += stringOffset;
+    size_t fieldSize = strlen(source->gr_name) + 1;
+    memcpy(cursor, source->gr_name, fieldSize);
+    result->gr_name = cursor;
+    cursor += fieldSize;
+    fieldSize = strlen(source->gr_passwd) + 1;
+    memcpy(cursor, source->gr_passwd, fieldSize);
+    result->gr_passwd = cursor;
+    cursor += fieldSize;
+    result->gr_gid = source->gr_gid;
+    for (size_t i = 0; i < memberCount; i++) {
+        fieldSize = strlen(source->gr_mem[i]) + 1;
+        memcpy(cursor, source->gr_mem[i], fieldSize);
+        members[i] = cursor;
+        cursor += fieldSize;
+    }
+    members[memberCount] = NULL;
+    result->gr_mem = members;
+    *resultPointer = result;
+    return 0;
+}
+
+static int getgrgidRFallback(gid_t gid, struct group *result, char *buffer, size_t bufferSize,
+                             struct group **resultPointer) {
+    static int (*function)(gid_t, struct group *, char *, size_t, struct group **);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getgrgid_r");
+    if (function == NULL) {
+        *resultPointer = NULL;
+        return ENOSYS;
+    }
+    return function(gid, result, buffer, bufferSize, resultPointer);
+}
+
+static int getgrnamRFallback(const char *name, struct group *result, char *buffer, size_t bufferSize,
+                             struct group **resultPointer) {
+    static int (*function)(const char *, struct group *, char *, size_t, struct group **);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getgrnam_r");
+    if (function == NULL) {
+        *resultPointer = NULL;
+        return ENOSYS;
+    }
+    return function(name, result, buffer, bufferSize, resultPointer);
+}
+
+int getgrgidRIntercept(gid_t gid, struct group *result, char *buffer, size_t bufferSize,
+                       struct group **resultPointer) {
+    struct group configured;
+    int configuredResult = termuxExec_getConfiguredGroupEntry(gid, NULL, &configured);
+    if (configuredResult == 0)
+        return copyGroupEntry(&configured, result, buffer, bufferSize, resultPointer);
+    if (configuredResult < 0) {
+        *resultPointer = NULL;
+        return errno;
+    }
+    return getgrgidRFallback(gid, result, buffer, bufferSize, resultPointer);
+}
+
+int getgrnamRIntercept(const char *name, struct group *result, char *buffer, size_t bufferSize,
+                       struct group **resultPointer) {
+    struct group configured;
+    int configuredResult = termuxExec_getConfiguredGroupEntry(0, name, &configured);
+    if (configuredResult == 0)
+        return copyGroupEntry(&configured, result, buffer, bufferSize, resultPointer);
+    if (configuredResult < 0) {
+        *resultPointer = NULL;
+        return errno;
+    }
+    return getgrnamRFallback(name, result, buffer, bufferSize, resultPointer);
 }

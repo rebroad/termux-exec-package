@@ -1,0 +1,21 @@
+LIBC {
+    global:
+        execl;
+        execle;
+        execlp;
+        execv;
+        execve;
+        execvp;
+        execvpe;
+        fexecve;
+        getgrgid;
+        getgrnam;
+        gethostname;
+        getpwnam;
+        getpwuid;
+        getpwnam_r;
+        getpwuid_r;
+        getgrnam_r;
+        getgrgid_r;
+    local: *;
+};

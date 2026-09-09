@@ -112,6 +112,10 @@ int termuxExec_getConfiguredPasswdEntry(uid_t uid, const char *name, struct pass
 /** Intercept passwd lookups for dynamically linked Termux processes. */
 struct passwd *getpwuidIntercept(uid_t uid);
 struct passwd *getpwnamIntercept(const char *name);
+int getpwuidRIntercept(uid_t uid, struct passwd *result, char *buffer, size_t bufferSize,
+                       struct passwd **resultPointer);
+int getpwnamRIntercept(const char *name, struct passwd *result, char *buffer, size_t bufferSize,
+                       struct passwd **resultPointer);
 
 /** Resolve a configured Termux group entry, returning `1` when none matches. */
 int termuxExec_getConfiguredGroupEntry(gid_t gid, const char *name, struct group *result);
@@ -119,6 +123,10 @@ int termuxExec_getConfiguredGroupEntry(gid_t gid, const char *name, struct group
 /** Intercept group lookups for dynamically linked Termux processes. */
 struct group *getgrgidIntercept(gid_t gid);
 struct group *getgrnamIntercept(const char *name);
+int getgrgidRIntercept(gid_t gid, struct group *result, char *buffer, size_t bufferSize,
+                       struct group **resultPointer);
+int getgrnamRIntercept(const char *name, struct group *result, char *buffer, size_t bufferSize,
+                       struct group **resultPointer);
 
 
 

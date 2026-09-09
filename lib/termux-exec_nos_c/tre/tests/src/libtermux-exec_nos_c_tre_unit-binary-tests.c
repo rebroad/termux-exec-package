@@ -102,7 +102,7 @@ static void test__getConfiguredHostname() {
     int fd = mkstemp(template);
     state__ATrue(fd >= 0);
 
-    const char *hostname = "termux\n";
+    const char *hostname = "termux-test-host\n";
     ssize_t bytesWritten = write(fd, hostname, strlen(hostname));
     int__AEqual((int) strlen(hostname), (int) bytesWritten);
     int__AEqual(0, close(fd));
@@ -111,11 +111,11 @@ static void test__getConfiguredHostname() {
 
     char buffer[HOST_NAME_MAX + 1];
     int__AEqual(0, termuxExec_getConfiguredHostname(buffer, sizeof(buffer)));
-    string__AEqual("termux", buffer);
+    string__AEqual("termux-test-host", buffer);
 
     memset(buffer, 0, sizeof(buffer));
     int__AEqual(0, gethostnameIntercept(buffer, sizeof(buffer)));
-    string__AEqual("termux", buffer);
+    string__AEqual("termux-test-host", buffer);
 
     char smallBuffer[5];
     errno = 0;
@@ -161,6 +161,18 @@ static void test__getConfiguredPasswd() {
     state__ATrue(lookup != NULL);
     int__AEqual(12345, (int) lookup->pw_uid);
 
+    char buffer[256];
+    struct passwd reentrantEntry;
+    struct passwd *reentrantLookup = NULL;
+    int__AEqual(0, getpwnamRIntercept("testuser", &reentrantEntry, buffer, sizeof(buffer), &reentrantLookup));
+    state__ATrue(reentrantLookup == &reentrantEntry);
+    string__AEqual("testuser", reentrantEntry.pw_name);
+    int__AEqual(12345, (int) reentrantEntry.pw_uid);
+
+    reentrantLookup = NULL;
+    int__AEqual(ERANGE, getpwnamRIntercept("testuser", &reentrantEntry, buffer, 1, &reentrantLookup));
+    state__ATrue(reentrantLookup == NULL);
+
     int__AEqual(0, unlink(template));
     int__AEqual(0, unsetenv(ENV__TERMUX_EXEC__PASSWD_FILE));
     errno = 0;
@@ -198,6 +210,14 @@ static void test__getConfiguredGroup() {
     lookup = getgrnamIntercept("testgroup");
     state__ATrue(lookup != NULL);
     int__AEqual(12345, (int) lookup->gr_gid);
+
+    char buffer[256];
+    struct group reentrantEntry;
+    struct group *reentrantLookup = NULL;
+    int__AEqual(0, getgrnamRIntercept("testgroup", &reentrantEntry, buffer, sizeof(buffer), &reentrantLookup));
+    state__ATrue(reentrantLookup == &reentrantEntry);
+    string__AEqual("testgroup", reentrantEntry.gr_name);
+    int__AEqual(12345, (int) reentrantEntry.gr_gid);
 
     int__AEqual(0, unlink(template));
     int__AEqual(0, unsetenv(ENV__TERMUX_EXEC__GROUP_FILE));
