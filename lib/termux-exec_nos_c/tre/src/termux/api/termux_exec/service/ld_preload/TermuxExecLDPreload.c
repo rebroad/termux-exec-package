@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <dlfcn.h>
+#include <dirent.h>
 
 #include <sys/syscall.h>
 
@@ -632,6 +633,83 @@ static _Thread_local FILE *sUtmpFile;
 static _Thread_local char sUtmpFilePath[PATH_MAX];
 static _Thread_local struct utmp sUtmpEntry;
 
+static int utmpProcessIsShell(const char *name) {
+    return strcmp(name, "bash") == 0 || strcmp(name, "sh") == 0 || strcmp(name, "zsh") == 0 ||
+           strcmp(name, "fish") == 0 || strcmp(name, "login") == 0;
+}
+
+static int readProcessUid(const char *path, uid_t *uid) {
+    FILE *file = fopen(path, "r");
+    if (file == NULL) return -1;
+    char line[256];
+    int result = -1;
+    while (fgets(line, sizeof(line), file) != NULL) {
+        unsigned long value;
+        if (sscanf(line, "Uid:\t%lu", &value) == 1 && value <= UINT_MAX) {
+            *uid = (uid_t) value;
+            result = 0;
+            break;
+        }
+    }
+    fclose(file);
+    return result;
+}
+
+static void refreshUtmpFile(const char *path) {
+    char temporaryPath[PATH_MAX];
+    if (snprintf(temporaryPath, sizeof(temporaryPath), "%s.termux-exec.%ld", path, (long) getpid()) < 0 ||
+        strlen(temporaryPath) >= sizeof(temporaryPath)) return;
+    FILE *file = fopen(temporaryPath, "wb");
+    if (file == NULL) return;
+
+    DIR *directory = opendir("/proc");
+    if (directory != NULL) {
+        struct dirent *entry;
+        while ((entry = readdir(directory)) != NULL) {
+            char *end = NULL;
+            unsigned long pidValue = strtoul(entry->d_name, &end, 10);
+            if (end == entry->d_name || *end != '\0' || pidValue > INT_MAX) continue;
+
+            char commPath[PATH_MAX];
+            char fdPath[PATH_MAX];
+            char linkPath[PATH_MAX];
+            char command[64];
+            if (snprintf(commPath, sizeof(commPath), "/proc/%s/comm", entry->d_name) < 0 ||
+                snprintf(fdPath, sizeof(fdPath), "/proc/%s/fd/0", entry->d_name) < 0) continue;
+            FILE *commFile = fopen(commPath, "r");
+            if (commFile == NULL || fgets(command, sizeof(command), commFile) == NULL) {
+                if (commFile != NULL) fclose(commFile);
+                continue;
+            }
+            fclose(commFile);
+            command[strcspn(command, "\r\n")] = '\0';
+            if (!utmpProcessIsShell(command)) continue;
+            ssize_t linkLength = readlink(fdPath, linkPath, sizeof(linkPath) - 1);
+            if (linkLength <= 9 || strncmp(linkPath, "/dev/pts/", 9) != 0) continue;
+            linkPath[linkLength] = '\0';
+
+            char uidPath[PATH_MAX];
+            uid_t uid;
+            if (snprintf(uidPath, sizeof(uidPath), "/proc/%s/status", entry->d_name) < 0 ||
+                readProcessUid(uidPath, &uid) != 0) continue;
+            struct passwd *passwd = getpwuidIntercept(uid);
+            if (passwd == NULL) continue;
+
+            struct utmp record = {0};
+            record.ut_type = USER_PROCESS;
+            record.ut_pid = (pid_t) pidValue;
+            snprintf(record.ut_line, sizeof(record.ut_line), "%s", linkPath + 5);
+            snprintf(record.ut_id, sizeof(record.ut_id), "%s", linkPath + 9);
+            snprintf(record.ut_user, sizeof(record.ut_user), "%s", passwd->pw_name);
+            record.ut_time = time(NULL);
+            if (fwrite(&record, sizeof(record), 1, file) != 1) break;
+        }
+        closedir(directory);
+    }
+    if (fclose(file) == 0) rename(temporaryPath, path);
+    else unlink(temporaryPath);
+}
+
 static const char *utmpFilePath(void) {
     const char *path = getenv("TERMUX_EXEC__UTMP_FILE");
     return path == NULL || path[0] == '\0' ? TERMUX_EXEC__UTMP_FILE_PATH : path;
@@ -657,6 +735,7 @@ int utmpnameIntercept(const char *path) {
 void setutentIntercept(void) {
     if (sUtmpFile != NULL) fclose(sUtmpFile);
     const char *path = sUtmpFilePath[0] == '\0' ? utmpFilePath() : sUtmpFilePath;
+    refreshUtmpFile(path);
     sUtmpFile = fopen(path, "rb+");
     if (sUtmpFile == NULL && errno == ENOENT) sUtmpFile = fopen(path, "rb");
 }
