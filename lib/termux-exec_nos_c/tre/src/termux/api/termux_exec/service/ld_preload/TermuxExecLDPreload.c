@@ -33,6 +33,7 @@ static int sSystemLinkerExecEnabled = -1;
 #define TERMUX_EXEC__HOSTNAME_FILE_PATH TERMUX__PREFIX "/etc/termux/hostname"
 #define TERMUX_EXEC__PASSWD_FILE_PATH TERMUX__PREFIX "/etc/passwd"
 #define TERMUX_EXEC__GROUP_FILE_PATH TERMUX__PREFIX "/etc/group"
+#define TERMUX_EXEC__UTMP_FILE_PATH TERMUX__PREFIX "/var/run/utmp"
 
 
 
@@ -625,4 +626,63 @@ int getgrnamRIntercept(const char *name, struct group *result, char *buffer, siz
         return errno;
     }
     return getgrnamRFallback(name, result, buffer, bufferSize, resultPointer);
+}
+
+static _Thread_local FILE *sUtmpFile;
+static _Thread_local char sUtmpFilePath[PATH_MAX];
+static _Thread_local struct utmp sUtmpEntry;
+
+static const char *utmpFilePath(void) {
+    const char *path = getenv("TERMUX_EXEC__UTMP_FILE");
+    return path == NULL || path[0] == '\0' ? TERMUX_EXEC__UTMP_FILE_PATH : path;
+}
+
+int utmpnameIntercept(const char *path) {
+    if (path == NULL || path[0] == '\0') {
+        errno = EINVAL;
+        return -1;
+    }
+    if (strlen(path) >= sizeof(sUtmpFilePath)) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    if (sUtmpFile != NULL) {
+        fclose(sUtmpFile);
+        sUtmpFile = NULL;
+    }
+    strcpy(sUtmpFilePath, path);
+    return 0;
+}
+
+void setutentIntercept(void) {
+    if (sUtmpFile != NULL) fclose(sUtmpFile);
+    const char *path = sUtmpFilePath[0] == '\0' ? utmpFilePath() : sUtmpFilePath;
+    sUtmpFile = fopen(path, "rb+");
+    if (sUtmpFile == NULL && errno == ENOENT) sUtmpFile = fopen(path, "rb");
+}
+
+struct utmp *getutentIntercept(void) {
+    if (sUtmpFile == NULL) setutentIntercept();
+    if (sUtmpFile == NULL) return NULL;
+    return fread(&sUtmpEntry, sizeof(sUtmpEntry), 1, sUtmpFile) == 1 ? &sUtmpEntry : NULL;
+}
+
+struct utmp *pututlineIntercept(const struct utmp *entry) {
+    if (entry == NULL) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (sUtmpFile == NULL) setutentIntercept();
+    if (sUtmpFile == NULL || fseek(sUtmpFile, 0, SEEK_END) != 0 ||
+        fwrite(entry, sizeof(*entry), 1, sUtmpFile) != 1 || fflush(sUtmpFile) != 0)
+        return NULL;
+    sUtmpEntry = *entry;
+    return &sUtmpEntry;
+}
+
+void endutentIntercept(void) {
+    if (sUtmpFile != NULL) {
+        fclose(sUtmpFile);
+        sUtmpFile = NULL;
+    }
 }

@@ -166,3 +166,9 @@ int getgrnam_r(const char *name, struct group *result, char *buffer, size_t buff
     termuxExec_directLdPreload_initProcess();
     return getgrnamRIntercept(name, result, buffer, bufferSize, resultPointer);
 }
+
+__attribute__((visibility("default"))) int utmpname(const char *path) { return utmpnameIntercept(path); }
+__attribute__((visibility("default"))) void setutent(void) { setutentIntercept(); }
+__attribute__((visibility("default"))) struct utmp *getutent(void) { return getutentIntercept(); }
+__attribute__((visibility("default"))) struct utmp *pututline(const struct utmp *entry) { return pututlineIntercept(entry); }
+__attribute__((visibility("default"))) void endutent(void) { endutentIntercept(); }

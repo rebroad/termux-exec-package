@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <grp.h>
 #include <pwd.h>
+#include <utmp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -127,6 +128,13 @@ int getgrgidRIntercept(gid_t gid, struct group *result, char *buffer, size_t buf
                        struct group **resultPointer);
 int getgrnamRIntercept(const char *name, struct group *result, char *buffer, size_t bufferSize,
                        struct group **resultPointer);
+
+/** Intercept Android's no-op utmp API with a file-backed implementation. */
+int utmpnameIntercept(const char *path);
+void setutentIntercept(void);
+struct utmp *getutentIntercept(void);
+struct utmp *pututlineIntercept(const struct utmp *entry);
+void endutentIntercept(void);
 
 
 

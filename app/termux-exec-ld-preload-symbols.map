@@ -17,5 +17,10 @@ LIBC {
         getpwuid_r;
         getgrnam_r;
         getgrgid_r;
+        utmpname;
+        setutent;
+        getutent;
+        pututline;
+        endutent;
     local: *;
 };
