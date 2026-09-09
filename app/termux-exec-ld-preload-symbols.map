@@ -11,6 +11,9 @@ LIBC {
         getgrgid;
         getgrnam;
         gethostname;
+        gethostbyname;
+        gethostbyname2;
+        getaddrinfo;
         getpwnam;
         getpwuid;
         getpwnam_r;

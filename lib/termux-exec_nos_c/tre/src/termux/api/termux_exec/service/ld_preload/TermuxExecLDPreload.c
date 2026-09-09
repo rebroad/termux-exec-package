@@ -4,6 +4,8 @@
 #include <grp.h>
 #include <libgen.h>
 #include <limits.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -248,6 +250,62 @@ int gethostnameIntercept(char *name, size_t len) {
     errno = ENOSYS;
     return -1;
 #endif
+}
+
+static _Thread_local struct hostent sConfiguredHostEntry;
+static _Thread_local struct in_addr sConfiguredHostAddress;
+static _Thread_local char sConfiguredHostName[HOST_NAME_MAX + 1];
+static _Thread_local char *sConfiguredHostAliases[1];
+static _Thread_local char *sConfiguredHostAddresses[2];
+
+static struct hostent *configuredHostEntry(const char *name, int addressFamily) {
+    if (addressFamily != AF_INET || name == NULL ||
+        termuxExec_getConfiguredHostname(sConfiguredHostName, sizeof(sConfiguredHostName)) != 0 ||
+        strcmp(name, sConfiguredHostName) != 0) return NULL;
+
+    sConfiguredHostAddress.s_addr = htonl(INADDR_LOOPBACK);
+    sConfiguredHostAliases[0] = NULL;
+    sConfiguredHostAddresses[0] = (char *) &sConfiguredHostAddress;
+    sConfiguredHostAddresses[1] = NULL;
+    sConfiguredHostEntry.h_name = sConfiguredHostName;
+    sConfiguredHostEntry.h_aliases = sConfiguredHostAliases;
+    sConfiguredHostEntry.h_addrtype = AF_INET;
+    sConfiguredHostEntry.h_length = sizeof(sConfiguredHostAddress);
+    sConfiguredHostEntry.h_addr_list = sConfiguredHostAddresses;
+    return &sConfiguredHostEntry;
+}
+
+struct hostent *gethostbynameIntercept(const char *name) {
+    struct hostent *configured = configuredHostEntry(name, AF_INET);
+    if (configured != NULL) return configured;
+    static struct hostent *(*function)(const char *);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "gethostbyname");
+    return function == NULL ? NULL : function(name);
+}
+
+struct hostent *gethostbyname2Intercept(const char *name, int addressFamily) {
+    struct hostent *configured = configuredHostEntry(name, addressFamily);
+    if (configured != NULL) return configured;
+    static struct hostent *(*function)(const char *, int);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "gethostbyname2");
+    return function == NULL ? NULL : function(name, addressFamily);
+}
+
+int getaddrinfoIntercept(const char *name, const char *service, const struct addrinfo *hints,
+                         struct addrinfo **result) {
+    static int (*function)(const char *, const char *, const struct addrinfo *, struct addrinfo **);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getaddrinfo");
+    if (function == NULL) return EAI_SYSTEM;
+
+    char configuredHostname[HOST_NAME_MAX + 1];
+    if (name != NULL && termuxExec_getConfiguredHostname(configuredHostname, sizeof(configuredHostname)) == 0 &&
+        strcmp(name, configuredHostname) == 0 &&
+        (hints == NULL || hints->ai_family == AF_UNSPEC || hints->ai_family == AF_INET ||
+         hints->ai_family == AF_INET6)) {
+        const char *loopback = hints != NULL && hints->ai_family == AF_INET6 ? "::1" : "127.0.0.1";
+        return function(loopback, service, hints, result);
+    }
+    return function(name, service, hints, result);
 }
 
 static _Thread_local struct passwd sPasswdEntry;

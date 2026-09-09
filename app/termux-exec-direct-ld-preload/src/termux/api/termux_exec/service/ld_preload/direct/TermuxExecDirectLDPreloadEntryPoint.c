@@ -116,6 +116,25 @@ int gethostname(char *name, size_t len) {
 }
 
 __attribute__((visibility("default")))
+struct hostent *gethostbyname(const char *name) {
+    termuxExec_directLdPreload_initProcess();
+    return gethostbynameIntercept(name);
+}
+
+__attribute__((visibility("default")))
+struct hostent *gethostbyname2(const char *name, int addressFamily) {
+    termuxExec_directLdPreload_initProcess();
+    return gethostbyname2Intercept(name, addressFamily);
+}
+
+__attribute__((visibility("default")))
+int getaddrinfo(const char *name, const char *service, const struct addrinfo *hints,
+                struct addrinfo **result) {
+    termuxExec_directLdPreload_initProcess();
+    return getaddrinfoIntercept(name, service, hints, result);
+}
+
+__attribute__((visibility("default")))
 struct passwd *getpwuid(uid_t uid) {
     termuxExec_directLdPreload_initProcess();
     return getpwuidIntercept(uid);

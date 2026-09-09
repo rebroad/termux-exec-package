@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <grp.h>
+#include <netdb.h>
 #include <pwd.h>
 #include <utmp.h>
 
@@ -104,6 +105,12 @@ int termuxExec_getConfiguredHostname(char *buffer, size_t bufferSize);
  * If no configured hostname exists, this falls back to the host syscall.
  */
 int gethostnameIntercept(char *name, size_t len);
+
+/** Resolve the configured Termux hostname to the local loopback address. */
+struct hostent *gethostbynameIntercept(const char *name);
+struct hostent *gethostbyname2Intercept(const char *name, int addressFamily);
+int getaddrinfoIntercept(const char *name, const char *service, const struct addrinfo *hints,
+                         struct addrinfo **result);
 
 /**
  * Resolve a configured Termux passwd entry, returning `1` when none matches.
