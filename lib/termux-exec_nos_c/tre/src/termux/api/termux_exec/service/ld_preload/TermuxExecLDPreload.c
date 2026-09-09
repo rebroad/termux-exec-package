@@ -252,6 +252,7 @@ int gethostnameIntercept(char *name, size_t len) {
 
 static _Thread_local struct passwd sPasswdEntry;
 static _Thread_local char sPasswdLine[4096];
+static _Thread_local FILE *sPasswdFile;
 static _Thread_local struct group sGroupEntry;
 static _Thread_local char sGroupLine[4096];
 static _Thread_local char *sGroupMembers[1] = {NULL};
@@ -363,6 +364,53 @@ struct passwd *getpwnamIntercept(const char *name) {
     if (configuredResult == 0) return &sPasswdEntry;
     if (configuredResult < 0) return NULL;
     return getpwnamFallback(name);
+}
+
+void setpwentIntercept(void) {
+    if (sPasswdFile != NULL) fclose(sPasswdFile);
+    const char *path = getenv(ENV__TERMUX_EXEC__PASSWD_FILE);
+    if (path == NULL || path[0] == '\0') path = TERMUX_EXEC__PASSWD_FILE_PATH;
+    sPasswdFile = fopen(path, "r");
+}
+
+struct passwd *getpwentIntercept(void) {
+    if (sPasswdFile == NULL) setpwentIntercept();
+    if (sPasswdFile == NULL) return NULL;
+
+    while (fgets(sPasswdLine, sizeof(sPasswdLine), sPasswdFile) != NULL) {
+        sPasswdLine[strcspn(sPasswdLine, "\r\n")] = '\0';
+        if (sPasswdLine[0] == '\0' || sPasswdLine[0] == '#') continue;
+        char *cursor = sPasswdLine;
+        char *name = nextPasswdField(&cursor);
+        char *password = nextPasswdField(&cursor);
+        char *uidString = nextPasswdField(&cursor);
+        char *gidString = nextPasswdField(&cursor);
+        char *gecos = nextPasswdField(&cursor);
+        char *home = nextPasswdField(&cursor);
+        char *shell = cursor;
+        char *end = NULL;
+        unsigned long uid = strtoul(uidString, &end, 10);
+        if (end == uidString || *end != '\0' || uid > UINT_MAX) continue;
+        end = NULL;
+        unsigned long gid = strtoul(gidString, &end, 10);
+        if (end == gidString || *end != '\0' || gid > UINT_MAX) continue;
+        sPasswdEntry.pw_name = name;
+        sPasswdEntry.pw_passwd = password;
+        sPasswdEntry.pw_uid = (uid_t) uid;
+        sPasswdEntry.pw_gid = (gid_t) gid;
+        sPasswdEntry.pw_gecos = gecos;
+        sPasswdEntry.pw_dir = home;
+        sPasswdEntry.pw_shell = shell;
+        return &sPasswdEntry;
+    }
+    return NULL;
+}
+
+void endpwentIntercept(void) {
+    if (sPasswdFile != NULL) {
+        fclose(sPasswdFile);
+        sPasswdFile = NULL;
+    }
 }
 
 static int copyPasswdEntry(const struct passwd *source, struct passwd *result, char *buffer,
@@ -656,6 +704,17 @@ static int readProcessUid(const char *path, uid_t *uid) {
 }
 
 static void refreshUtmpFile(const char *path) {
+    struct utmp previousRecords[256];
+    size_t previousCount = 0;
+    FILE *previousFile = fopen(path, "rb");
+    if (previousFile != NULL) {
+        while (previousCount < sizeof(previousRecords) / sizeof(previousRecords[0]) &&
+               fread(&previousRecords[previousCount], sizeof(previousRecords[previousCount]), 1, previousFile) == 1) {
+            previousCount++;
+        }
+        fclose(previousFile);
+    }
+
     char temporaryPath[PATH_MAX];
     if (snprintf(temporaryPath, sizeof(temporaryPath), "%s.termux-exec.%ld", path, (long) getpid()) < 0 ||
         strlen(temporaryPath) >= sizeof(temporaryPath)) return;
@@ -702,6 +761,13 @@ static void refreshUtmpFile(const char *path) {
             snprintf(record.ut_id, sizeof(record.ut_id), "%s", linkPath + 9);
             snprintf(record.ut_user, sizeof(record.ut_user), "%s", passwd->pw_name);
             record.ut_time = time(NULL);
+            for (size_t index = 0; index < previousCount; index++) {
+                if (strncmp(previousRecords[index].ut_line, record.ut_line, sizeof(record.ut_line)) == 0 &&
+                    previousRecords[index].ut_type == USER_PROCESS) {
+                    record.ut_time = previousRecords[index].ut_time;
+                    break;
+                }
+            }
             if (fwrite(&record, sizeof(record), 1, file) != 1) break;
         }
         closedir(directory);

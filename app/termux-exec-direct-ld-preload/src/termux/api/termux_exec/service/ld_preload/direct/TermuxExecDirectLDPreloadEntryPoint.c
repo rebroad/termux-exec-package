@@ -142,6 +142,18 @@ int getpwnam_r(const char *name, struct passwd *result, char *buffer, size_t buf
 }
 
 __attribute__((visibility("default")))
+void setpwent(void) {
+    termuxExec_directLdPreload_initProcess();
+    setpwentIntercept();
+}
+
+__attribute__((visibility("default")))
+struct passwd *getpwent(void) {
+    termuxExec_directLdPreload_initProcess();
+    return getpwentIntercept();
+}
+
+__attribute__((visibility("default")))
 struct group *getgrgid(gid_t gid) {
     termuxExec_directLdPreload_initProcess();
     return getgrgidIntercept(gid);

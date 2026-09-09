@@ -113,6 +113,8 @@ int termuxExec_getConfiguredPasswdEntry(uid_t uid, const char *name, struct pass
 /** Intercept passwd lookups for dynamically linked Termux processes. */
 struct passwd *getpwuidIntercept(uid_t uid);
 struct passwd *getpwnamIntercept(const char *name);
+void setpwentIntercept(void);
+struct passwd *getpwentIntercept(void);
 int getpwuidRIntercept(uid_t uid, struct passwd *result, char *buffer, size_t bufferSize,
                        struct passwd **resultPointer);
 int getpwnamRIntercept(const char *name, struct passwd *result, char *buffer, size_t bufferSize,

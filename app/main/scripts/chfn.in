@@ -1,0 +1,87 @@
+#!@TERMUX__PREFIX@/bin/sh
+
+set -eu
+
+prefix='@TERMUX__PREFIX@'
+passwd_file="${TERMUX_EXEC__PASSWD_FILE:-$prefix/etc/passwd}"
+full_name=''
+
+usage() {
+    printf 'Usage: chfn [-f full-name] [user]\n'
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -f|--full-name)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            full_name=$2
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -* )
+            usage >&2
+            exit 2
+            ;;
+        *)
+            [ -z "${user:-}" ] || { usage >&2; exit 2; }
+            user=$1
+            shift
+            ;;
+    esac
+done
+
+if [ "$#" -gt 0 ]; then
+    [ -z "${user:-}" ] || { usage >&2; exit 2; }
+    user=$1
+    shift
+fi
+[ "$#" -eq 0 ] || { usage >&2; exit 2; }
+
+current_user=$(id -un)
+user=${user:-$current_user}
+if [ "$user" != "$current_user" ] && [ "$(id -u)" != 0 ]; then
+    printf 'chfn: only the current Termux user may be changed\n' >&2
+    exit 1
+fi
+
+if [ -z "$full_name" ]; then
+    printf 'Changing user information for %s\nFull Name [%s]: ' "$user" "$user"
+    IFS= read -r full_name || true
+fi
+
+case "$full_name" in
+    *:*|*'\n'*)
+        printf 'chfn: the full name may not contain : or a newline\n' >&2
+        exit 1
+        ;;
+esac
+
+lock="$passwd_file.lock"
+temporary="$passwd_file.tmp.$$"
+cleanup() {
+    rm -f "$temporary"
+    rmdir "$lock" 2>/dev/null || true
+}
+trap cleanup EXIT HUP INT TERM
+if ! mkdir "$lock" 2>/dev/null; then
+    printf 'chfn: passwd file is busy\n' >&2
+    exit 1
+fi
+
+awk -F: -v OFS=: -v user="$user" -v full_name="$full_name" '
+    $1 == user { $5 = full_name; found = 1 }
+    { print }
+    END { if (!found) exit 1 }
+' "$passwd_file" >"$temporary" || {
+    printf 'chfn: user %s was not found in %s\n' "$user" "$passwd_file" >&2
+    exit 1
+}
+chmod --reference="$passwd_file" "$temporary" 2>/dev/null || chmod 600 "$temporary"
+mv "$temporary" "$passwd_file"
