@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <libgen.h>
 #include <limits.h>
 #include <pwd.h>
@@ -31,6 +32,7 @@ static int sSystemLinkerExecEnabled = -1;
 
 #define TERMUX_EXEC__HOSTNAME_FILE_PATH TERMUX__PREFIX "/etc/termux/hostname"
 #define TERMUX_EXEC__PASSWD_FILE_PATH TERMUX__PREFIX "/etc/passwd"
+#define TERMUX_EXEC__GROUP_FILE_PATH TERMUX__PREFIX "/etc/group"
 
 
 
@@ -248,6 +250,9 @@ int gethostnameIntercept(char *name, size_t len) {
 
 static _Thread_local struct passwd sPasswdEntry;
 static _Thread_local char sPasswdLine[4096];
+static _Thread_local struct group sGroupEntry;
+static _Thread_local char sGroupLine[4096];
+static _Thread_local char *sGroupMembers[1] = {NULL};
 
 static char *nextPasswdField(char **cursor) {
     char *field = *cursor;
@@ -356,4 +361,103 @@ struct passwd *getpwnamIntercept(const char *name) {
     if (configuredResult == 0) return &sPasswdEntry;
     if (configuredResult < 0) return NULL;
     return getpwnamFallback(name);
+}
+
+static struct group *getgrgidFallback(gid_t gid) {
+    static struct group *(*function)(gid_t);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getgrgid");
+    if (function == NULL) {
+        errno = ENOSYS;
+        return NULL;
+    }
+    return function(gid);
+}
+
+static struct group *getgrnamFallback(const char *name) {
+    static struct group *(*function)(const char *);
+    if (function == NULL) function = dlsym(RTLD_NEXT, "getgrnam");
+    if (function == NULL) {
+        errno = ENOSYS;
+        return NULL;
+    }
+    return function(name);
+}
+
+static char *nextGroupField(char **cursor) {
+    char *field = *cursor;
+    char *separator = strchr(field, ':');
+    if (separator != NULL) {
+        *separator = '\0';
+        *cursor = separator + 1;
+    } else {
+        *cursor = field + strlen(field);
+    }
+    return field;
+}
+
+int termuxExec_getConfiguredGroupEntry(gid_t gid, const char *name, struct group *result) {
+    if (name == NULL && result == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    const char *groupFilePath = getenv(ENV__TERMUX_EXEC__GROUP_FILE);
+    if (groupFilePath == NULL || strlen(groupFilePath) < 1)
+        groupFilePath = TERMUX_EXEC__GROUP_FILE_PATH;
+
+    FILE *file = fopen(groupFilePath, "r");
+    if (file == NULL) {
+        if (errno == ENOENT) {
+            errno = 0;
+            return 1;
+        }
+        return -1;
+    }
+
+    while (fgets(sGroupLine, sizeof(sGroupLine), file) != NULL) {
+        sGroupLine[strcspn(sGroupLine, "\r\n")] = '\0';
+        if (sGroupLine[0] == '\0' || sGroupLine[0] == '#') continue;
+
+        char *cursor = sGroupLine;
+        char *entryName = nextGroupField(&cursor);
+        (void) nextGroupField(&cursor); // password
+        char *gidString = nextGroupField(&cursor);
+        (void) nextGroupField(&cursor); // members
+        char *end = NULL;
+        unsigned long entryGid = strtoul(gidString, &end, 10);
+        if (end == gidString || *end != '\0' || entryGid > UINT_MAX) continue;
+
+        if ((name != NULL && strcmp(name, entryName) != 0) ||
+            (name == NULL && (gid_t) entryGid != gid)) continue;
+
+        sGroupEntry.gr_name = entryName;
+        sGroupEntry.gr_passwd = (char *) "x";
+        sGroupEntry.gr_gid = (gid_t) entryGid;
+        sGroupEntry.gr_mem = sGroupMembers;
+        if (result != NULL) *result = sGroupEntry;
+        fclose(file);
+        return 0;
+    }
+
+    int savedErrno = errno;
+    fclose(file);
+    errno = savedErrno;
+    if (errno == 0) return 1;
+    return -1;
+}
+
+struct group *getgrgidIntercept(gid_t gid) {
+    struct group result;
+    int configuredResult = termuxExec_getConfiguredGroupEntry(gid, NULL, &result);
+    if (configuredResult == 0) return &sGroupEntry;
+    if (configuredResult < 0) return NULL;
+    return getgrgidFallback(gid);
+}
+
+struct group *getgrnamIntercept(const char *name) {
+    struct group result;
+    int configuredResult = termuxExec_getConfiguredGroupEntry(0, name, &result);
+    if (configuredResult == 0) return &sGroupEntry;
+    if (configuredResult < 0) return NULL;
+    return getgrnamFallback(name);
 }

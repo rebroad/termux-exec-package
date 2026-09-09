@@ -38,6 +38,7 @@ The `termux-exec` uses the following environment variables as input if required.
 - [`TERMUX_EXEC__EXECVE_CALL__INTERCEPT`](#termux_exec__execve_call__intercept)
 - [`TERMUX_EXEC__HOSTNAME_FILE`](#termux_exec__hostname_file)
 - [`TERMUX_EXEC__PASSWD_FILE`](#termux_exec__passwd_file)
+- [`TERMUX_EXEC__GROUP_FILE`](#termux_exec__group_file)
 - [`TERMUX_EXEC__SYSTEM_LINKER_EXEC__MODE`](#termux_exec__system_linker_exec__mode)
 - [`TERMUX_EXEC__TESTS__LOG_LEVEL`](#termux_exec__tests__log_level)
 
@@ -171,6 +172,25 @@ When this file contains a non-empty first line, dynamically linked programs laun
 
 - An absolute path to a readable file.
 - The first line should contain the hostname without leading or trailing shell syntax.
+
+Changes apply to newly started dynamically linked processes after `$LD_PRELOAD` has loaded `libtermux-exec-ld-preload.so`.
+
+## &nbsp;
+
+### TERMUX_EXEC__GROUP_FILE
+
+Path to the user group config file read by the `termux-exec` `$LD_PRELOAD` library. If unset, the library reads `$TERMUX__PREFIX/etc/group`.
+
+When this file contains a matching `group` entry, dynamically linked programs launched under Termux will use its group name and numeric GID for `getgrgid()` and `getgrnam()` lookups. If there is no matching entry, the system lookup is used.
+
+**Type:** `string`
+
+**Default value:** `$TERMUX__PREFIX/etc/group`
+
+**Assigned values:**
+
+- An absolute path to a readable colon-separated group file.
+- Entries use the standard `name:password:gid:members` format.
 
 Changes apply to newly started dynamically linked processes after `$LD_PRELOAD` has loaded `libtermux-exec-ld-preload.so`.
 

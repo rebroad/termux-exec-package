@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <grp.h>
 #include <pwd.h>
 
 #ifdef __cplusplus
@@ -111,6 +112,13 @@ int termuxExec_getConfiguredPasswdEntry(uid_t uid, const char *name, struct pass
 /** Intercept passwd lookups for dynamically linked Termux processes. */
 struct passwd *getpwuidIntercept(uid_t uid);
 struct passwd *getpwnamIntercept(const char *name);
+
+/** Resolve a configured Termux group entry, returning `1` when none matches. */
+int termuxExec_getConfiguredGroupEntry(gid_t gid, const char *name, struct group *result);
+
+/** Intercept group lookups for dynamically linked Termux processes. */
+struct group *getgrgidIntercept(gid_t gid);
+struct group *getgrnamIntercept(const char *name);
 
 
 

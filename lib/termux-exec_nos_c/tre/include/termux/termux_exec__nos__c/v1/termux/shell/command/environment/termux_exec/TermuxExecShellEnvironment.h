@@ -115,6 +115,14 @@ static const int ENV_DEF_VAL__TERMUX_EXEC__SYSTEM_LINKER_EXEC__MODE = 1;
  */
 #define ENV__TERMUX_EXEC__PASSWD_FILE TERMUX_ENV__S_TERMUX_EXEC "PASSWD_FILE"
 
+/**
+ * Environment variable for overriding the user group config file path.
+ *
+ * This is primarily for tests. Runtime configuration should normally use
+ * `$TERMUX__PREFIX/etc/group`.
+ */
+#define ENV__TERMUX_EXEC__GROUP_FILE TERMUX_ENV__S_TERMUX_EXEC "GROUP_FILE"
+
 
 
 

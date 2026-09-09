@@ -117,3 +117,15 @@ struct passwd *getpwnam(const char *name) {
     termuxExec_directLdPreload_initProcess();
     return getpwnamIntercept(name);
 }
+
+__attribute__((visibility("default")))
+struct group *getgrgid(gid_t gid) {
+    termuxExec_directLdPreload_initProcess();
+    return getgrgidIntercept(gid);
+}
+
+__attribute__((visibility("default")))
+struct group *getgrnam(const char *name) {
+    termuxExec_directLdPreload_initProcess();
+    return getgrnamIntercept(name);
+}

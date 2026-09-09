@@ -3,6 +3,7 @@
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +41,7 @@ static void runTests();
 
 static void test__getConfiguredHostname();
 static void test__getConfiguredPasswd();
+static void test__getConfiguredGroup();
 
 
 
@@ -80,6 +82,7 @@ void runTests() {
     ExecIntercept_runTests();
     test__getConfiguredHostname();
     test__getConfiguredPasswd();
+    test__getConfiguredGroup();
 
     logDebug(LOG_TAG, "runTests(end)");
 
@@ -160,5 +163,43 @@ static void test__getConfiguredPasswd() {
 
     int__AEqual(0, unlink(template));
     int__AEqual(0, unsetenv(ENV__TERMUX_EXEC__PASSWD_FILE));
+    errno = 0;
+}
+
+static void test__getConfiguredGroup() {
+    logVerbose(LOG_TAG, "test__getConfiguredGroup()");
+
+    char template[PATH_MAX];
+#ifdef __ANDROID__
+    const char *tmpDir = TERMUX__PREFIX "/tmp";
+#else
+    const char *tmpDir = "/var/tmp";
+#endif
+    int__AEqual(0, mkdir(tmpDir, 0700) == 0 || errno == EEXIST ? 0 : -1);
+    snprintf(template, sizeof(template), "%s/termux-exec-group-test.XXXXXX", tmpDir) < 0 ? abort() : (void)0;
+    int fd = mkstemp(template);
+    state__ATrue(fd >= 0);
+
+    const char *group = "testgroup:x:12345:\n";
+    ssize_t bytesWritten = write(fd, group, strlen(group));
+    int__AEqual((int) strlen(group), (int) bytesWritten);
+    int__AEqual(0, close(fd));
+
+    int__AEqual(0, setenv(ENV__TERMUX_EXEC__GROUP_FILE, template, 1));
+
+    struct group entry;
+    int__AEqual(0, termuxExec_getConfiguredGroupEntry(12345, NULL, &entry));
+    string__AEqual("testgroup", entry.gr_name);
+    int__AEqual(12345, (int) entry.gr_gid);
+
+    struct group *lookup = getgrgidIntercept(12345);
+    state__ATrue(lookup != NULL);
+    string__AEqual("testgroup", lookup->gr_name);
+    lookup = getgrnamIntercept("testgroup");
+    state__ATrue(lookup != NULL);
+    int__AEqual(12345, (int) lookup->gr_gid);
+
+    int__AEqual(0, unlink(template));
+    int__AEqual(0, unsetenv(ENV__TERMUX_EXEC__GROUP_FILE));
     errno = 0;
 }
