@@ -761,18 +761,46 @@ static int readProcessUid(const char *path, uid_t *uid) {
     return result;
 }
 
-static void refreshUtmpFile(const char *path) {
-    struct utmp previousRecords[256];
-    size_t previousCount = 0;
-    FILE *previousFile = fopen(path, "rb");
-    if (previousFile != NULL) {
-        while (previousCount < sizeof(previousRecords) / sizeof(previousRecords[0]) &&
-               fread(&previousRecords[previousCount], sizeof(previousRecords[previousCount]), 1, previousFile) == 1) {
-            previousCount++;
+static int readProcessStartTime(const char *path, time_t *startTime) {
+    FILE *file = fopen(path, "r");
+    if (file == NULL) return -1;
+    char line[4096];
+    int result = -1;
+    if (fgets(line, sizeof(line), file) != NULL) {
+        char *fields = strrchr(line, ')');
+        if (fields != NULL && fields[1] == ' ') {
+            fields += 2;
+            char *savePointer = NULL;
+            char *field = strtok_r(fields, " ", &savePointer);
+            unsigned long long startTicks = 0;
+            for (int fieldNumber = 3; field != NULL && fieldNumber <= 22;
+                 fieldNumber++, field = strtok_r(NULL, " ", &savePointer)) {
+                if (fieldNumber == 22) {
+                    char *end = NULL;
+                    startTicks = strtoull(field, &end, 10);
+                    if (end != field && *end == '\0') result = 0;
+                }
+            }
+            if (result == 0) {
+                long clockTicks = sysconf(_SC_CLK_TCK);
+                struct timespec monotonicTime;
+                if (clockTicks <= 0 || clock_gettime(CLOCK_BOOTTIME, &monotonicTime) != 0) {
+                    result = -1;
+                } else {
+                    time_t now = time(NULL);
+                    double currentMonotonic = (double)monotonicTime.tv_sec +
+                                               ((double)monotonicTime.tv_nsec / 1000000000.0);
+                    *startTime = (time_t)((double)now - currentMonotonic +
+                                          ((double)startTicks / (double)clockTicks));
+                }
+            }
         }
-        fclose(previousFile);
     }
+    fclose(file);
+    return result;
+}
 
+static void refreshUtmpFile(const char *path) {
     char temporaryPath[PATH_MAX];
     if (snprintf(temporaryPath, sizeof(temporaryPath), "%s.termux-exec.%ld", path, (long) getpid()) < 0 ||
         strlen(temporaryPath) >= sizeof(temporaryPath)) return;
@@ -806,8 +834,10 @@ static void refreshUtmpFile(const char *path) {
             linkPath[linkLength] = '\0';
 
             char uidPath[PATH_MAX];
+            char statPath[PATH_MAX];
             uid_t uid;
             if (snprintf(uidPath, sizeof(uidPath), "/proc/%s/status", entry->d_name) < 0 ||
+                snprintf(statPath, sizeof(statPath), "/proc/%s/stat", entry->d_name) < 0 ||
                 readProcessUid(uidPath, &uid) != 0) continue;
             struct passwd *passwd = getpwuidIntercept(uid);
             if (passwd == NULL) continue;
@@ -818,14 +848,7 @@ static void refreshUtmpFile(const char *path) {
             snprintf(record.ut_line, sizeof(record.ut_line), "%s", linkPath + 5);
             snprintf(record.ut_id, sizeof(record.ut_id), "%s", linkPath + 9);
             snprintf(record.ut_user, sizeof(record.ut_user), "%s", passwd->pw_name);
-            record.ut_time = time(NULL);
-            for (size_t index = 0; index < previousCount; index++) {
-                if (strncmp(previousRecords[index].ut_line, record.ut_line, sizeof(record.ut_line)) == 0 &&
-                    previousRecords[index].ut_type == USER_PROCESS) {
-                    record.ut_time = previousRecords[index].ut_time;
-                    break;
-                }
-            }
+            if (readProcessStartTime(statPath, &record.ut_time) != 0) continue;
             if (fwrite(&record, sizeof(record), 1, file) != 1) break;
         }
         closedir(directory);
