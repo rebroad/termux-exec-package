@@ -1,0 +1,49 @@
+#!@TERMUX__PREFIX@/bin/sh
+
+set -e
+umask 077
+
+usage() {
+    echo "Usage: termux-identity USERNAME HOSTNAME" >&2
+    echo "       termux-identity --show" >&2
+    exit 2
+}
+
+valid_name() {
+    case "$1" in
+        ''|[!A-Za-z_]*|*[!A-Za-z0-9_.-]*) return 1 ;;
+    esac
+}
+
+if [ "${1:-}" = "--show" ] && [ "$#" -eq 1 ]; then
+    printf 'username: '; awk -F: 'NR == 1 { print $1 }' "$PREFIX/etc/passwd" 2>/dev/null || true
+    printf 'hostname: '; sed -n '1p' "$PREFIX/etc/termux/hostname" 2>/dev/null || true
+    exit 0
+fi
+
+[ "$#" -eq 2 ] || usage
+username=$1
+hostname=$2
+valid_name "$username" || { echo "Invalid username: $username" >&2; exit 1; }
+valid_name "$hostname" || { echo "Invalid hostname: $hostname" >&2; exit 1; }
+
+uid=$(id -u)
+gid=$(id -g)
+home=${HOME:-$PREFIX/../home}
+shell=$PREFIX/bin/bash
+etc=$PREFIX/etc
+mkdir -p "$etc/termux"
+
+passwd_tmp=$(mktemp "$PREFIX/tmp/termux-passwd.XXXXXX")
+group_tmp=$(mktemp "$PREFIX/tmp/termux-group.XXXXXX")
+hostname_tmp=$(mktemp "$PREFIX/tmp/termux-hostname.XXXXXX")
+trap 'rm -f "$passwd_tmp" "$group_tmp" "$hostname_tmp"' EXIT HUP INT TERM
+
+printf '%s:x:%s:%s:%s:%s:%s\n' "$username" "$uid" "$gid" "$username" "$home" "$shell" > "$passwd_tmp"
+printf '%s:x:%s:\n' "$username" "$gid" > "$group_tmp"
+printf '%s\n' "$hostname" > "$hostname_tmp"
+mv "$passwd_tmp" "$etc/passwd"
+mv "$group_tmp" "$etc/group"
+mv "$hostname_tmp" "$etc/termux/hostname"
+trap - EXIT HUP INT TERM
+printf 'Termux identity set to %s@%s\n' "$username" "$hostname"
