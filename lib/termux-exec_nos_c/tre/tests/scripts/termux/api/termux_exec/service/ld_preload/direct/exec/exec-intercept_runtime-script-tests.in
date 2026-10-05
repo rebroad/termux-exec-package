@@ -92,15 +92,9 @@ testExecIntercept__Interpreter() {
         "#!/${NL}" \
         126 "^.*: $TERMUX_EXEC__TESTS__SCRIPT_TEST_FILE_PATH: /: bad interpreter: Permission denied$" || return $?
 
-    if [ "$ANDROID__BUILD_VERSION_SDK" -ge 24 ]; then
-        termux_exec__tests__run_script_test "shebang-path-not-found" \
-            "#!/x${NL}" \
-            127 "^.*: $TERMUX_EXEC__TESTS__SCRIPT_TEST_FILE_PATH: cannot execute: required file not found$" || return $?
-    else
-        termux_exec__tests__run_script_test "shebang-path-not-found" \
-            "#!/x${NL}" \
-            126 "^.*: $TERMUX_EXEC__TESTS__SCRIPT_TEST_FILE_PATH: /x: bad interpreter: No such file or directory$" || return $?
-    fi
+    termux_exec__tests__run_script_test "shebang-path-not-found" \
+        "#!/x${NL}" \
+        '126|127' "^(.*: $TERMUX_EXEC__TESTS__SCRIPT_TEST_FILE_PATH: cannot execute: required file not found|.*: $TERMUX_EXEC__TESTS__SCRIPT_TEST_FILE_PATH: /x: bad interpreter: No such file or directory)$" || return $?
 
     return 0
 

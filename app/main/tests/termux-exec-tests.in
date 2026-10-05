@@ -408,7 +408,7 @@ termux_exec__tests__run_script_test() {
         termux_exec__tests__log_error "FAILED: '$test_name' test"
         termux_exec__tests__log_error "Expected output_regex does not equal match actual output"
         test_failed="true"
-    elif [ $actual_exit_code != "$expected_exit_code" ]; then
+    elif [[ ! "$actual_exit_code" =~ ^($expected_exit_code)$ ]]; then
         termux_exec__tests__log_error "$actual_output"
         termux_exec__tests__log_error "FAILED: '$test_name' test"
         termux_exec__tests__log_error "Expected result_code does not equal actual result_code"
