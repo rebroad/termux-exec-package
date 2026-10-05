@@ -17,6 +17,20 @@
 #include <dirent.h>
 
 #include <sys/syscall.h>
+#include <sys/ptrace.h>
+#include <sys/prctl.h>
+#include <sys/uio.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+#include <linux/audit.h>
+#include <linux/elf.h>
+#include <linux/filter.h>
+#include <linux/seccomp.h>
+#include <stddef.h>
+#include <stdint.h>
+#if defined(__aarch64__)
+#include <asm/ptrace.h>
+#endif
 
 #include <termux/termux_core__nos__c/v1/android/shell/command/environment/AndroidShellEnvironment.h>
 #include <termux/termux_core__nos__c/v1/data/DataUtils.h>
@@ -37,6 +51,245 @@ static int sSystemLinkerExecEnabled = -1;
 #define TERMUX_EXEC__PASSWD_FILE_PATH TERMUX__PREFIX "/etc/passwd"
 #define TERMUX_EXEC__GROUP_FILE_PATH TERMUX__PREFIX "/etc/group"
 #define TERMUX_EXEC__UTMP_FILE_PATH TERMUX__PREFIX "/var/run/utmp"
+
+#if defined(__aarch64__)
+/* Seccomp selects uname while ptrace emulates its result and follows execs. */
+static struct utsname sInterceptedUname;
+
+struct tracedSyscall {
+  pid_t pid;
+  bool interceptUnameOnExit;
+  uintptr_t unameBuffer;
+  struct tracedSyscall *next;
+};
+
+static struct tracedSyscall *findTracedSyscall(struct tracedSyscall **tracees,
+                                               pid_t pid) {
+  for (struct tracedSyscall *tracee = *tracees; tracee != NULL;
+       tracee = tracee->next) {
+    if (tracee->pid == pid)
+      return tracee;
+  }
+  struct tracedSyscall *tracee = calloc(1, sizeof(*tracee));
+  if (tracee == NULL)
+    return NULL;
+  tracee->pid = pid;
+  tracee->next = *tracees;
+  *tracees = tracee;
+  return tracee;
+}
+
+static void removeTracedSyscall(struct tracedSyscall **tracees, pid_t pid) {
+  struct tracedSyscall **link = tracees;
+  while (*link != NULL) {
+    if ((*link)->pid == pid) {
+      struct tracedSyscall *removed = *link;
+      *link = removed->next;
+      free(removed);
+      return;
+    }
+    link = &(*link)->next;
+  }
+}
+
+static long writeTracedUname(pid_t pid, uintptr_t buffer) {
+  struct iovec local = {.iov_base = &sInterceptedUname,
+                        .iov_len = sizeof(sInterceptedUname)};
+  struct iovec remote = {.iov_base = (void *)buffer,
+                         .iov_len = sizeof(sInterceptedUname)};
+  ssize_t written = process_vm_writev(pid, &local, 1, &remote, 1, 0);
+  return written == sizeof(sInterceptedUname) ? 0 : -EFAULT;
+}
+
+static void traceProcessTree(pid_t targetPid, int readyFd, int startFd) {
+  unsigned long options = PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK |
+                          PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE |
+                          PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT |
+                          PTRACE_O_TRACESECCOMP;
+  char ready = 0;
+  if (ptrace(PTRACE_SEIZE, targetPid, NULL, (void *)options) == 0)
+    ready = 1;
+  (void)write(readyFd, &ready, sizeof(ready));
+  close(readyFd);
+  char start = 0;
+  ssize_t startSize = read(startFd, &start, sizeof(start));
+  close(startFd);
+  if (!ready || startSize != sizeof(start) || start != 1) {
+    if (ready && ptrace(PTRACE_INTERRUPT, targetPid, NULL, NULL) == 0) {
+      int status;
+      if (waitpid(targetPid, &status, __WALL) == targetPid &&
+          WIFSTOPPED(status)) {
+        (void)ptrace(PTRACE_DETACH, targetPid, NULL, NULL);
+      }
+    }
+    _exit(0);
+  }
+
+  struct tracedSyscall *tracees = NULL;
+  (void)findTracedSyscall(&tracees, targetPid);
+  for (;;) {
+    int status;
+    pid_t pid = waitpid(-1, &status, __WALL);
+    if (pid < 0) {
+      if (errno == EINTR)
+        continue;
+      break;
+    }
+    if (WIFEXITED(status) || WIFSIGNALED(status)) {
+      removeTracedSyscall(&tracees, pid);
+      continue;
+    }
+    if (!WIFSTOPPED(status))
+      continue;
+
+    unsigned int event = (unsigned int)status >> 16;
+    int signalNumber = WSTOPSIG(status);
+    if (event == PTRACE_EVENT_FORK || event == PTRACE_EVENT_VFORK ||
+        event == PTRACE_EVENT_CLONE) {
+      unsigned long childPid = 0;
+      if (ptrace(PTRACE_GETEVENTMSG, pid, NULL, &childPid) == 0) {
+        (void)findTracedSyscall(&tracees, (pid_t)childPid);
+      }
+    }
+
+    struct tracedSyscall *tracee = findTracedSyscall(&tracees, pid);
+    if (event == PTRACE_EVENT_SECCOMP && tracee != NULL) {
+      struct ptrace_syscall_info syscallInfo = {0};
+      long infoSize = ptrace(PTRACE_GET_SYSCALL_INFO, pid, sizeof(syscallInfo),
+                             &syscallInfo);
+      if (infoSize >= 0 && syscallInfo.op == PTRACE_SYSCALL_INFO_SECCOMP &&
+          syscallInfo.seccomp.nr == __NR_uname) {
+        /* Wait for this selected syscall's exit to replace its output. */
+        tracee->interceptUnameOnExit = true;
+        tracee->unameBuffer = (uintptr_t)syscallInfo.seccomp.args[0];
+      }
+    } else if (signalNumber == (SIGTRAP | 0x80) && tracee != NULL &&
+               tracee->interceptUnameOnExit) {
+      struct ptrace_syscall_info syscallInfo = {0};
+      long infoSize = ptrace(PTRACE_GET_SYSCALL_INFO, pid, sizeof(syscallInfo),
+                             &syscallInfo);
+      if (infoSize >= 0 && syscallInfo.op == PTRACE_SYSCALL_INFO_EXIT) {
+        struct user_pt_regs registers;
+        struct iovec registersIov = {.iov_base = &registers,
+                                     .iov_len = sizeof(registers)};
+        if (ptrace(PTRACE_GETREGSET, pid, (void *)(uintptr_t)NT_PRSTATUS,
+                   &registersIov) == 0) {
+          registers.regs[0] =
+              (unsigned long)writeTracedUname(pid, tracee->unameBuffer);
+          (void)ptrace(PTRACE_SETREGSET, pid, (void *)(uintptr_t)NT_PRSTATUS,
+                       &registersIov);
+        }
+        tracee->interceptUnameOnExit = false;
+        signalNumber = 0;
+      } else {
+        signalNumber = 0;
+      }
+    } else if (signalNumber == SIGTRAP && event != 0) {
+      signalNumber = 0;
+    } else if (signalNumber == SIGSTOP) {
+      signalNumber = 0;
+    }
+    /* Other syscalls resume without ptrace entry/exit stops. */
+    (void)ptrace(tracee != NULL && tracee->interceptUnameOnExit ? PTRACE_SYSCALL
+                                                                : PTRACE_CONT,
+                 pid, NULL, (void *)(intptr_t)signalNumber);
+  }
+
+  while (tracees != NULL) {
+    struct tracedSyscall *next = tracees->next;
+    free(tracees);
+    tracees = next;
+  }
+  _exit(0);
+}
+
+static bool processIsAlreadyTraced(void) {
+  FILE *status = fopen("/proc/self/status", "r");
+  if (status == NULL)
+    return false;
+  char line[128];
+  bool traced = false;
+  while (fgets(line, sizeof(line), status) != NULL) {
+    if (strncmp(line, "TracerPid:", sizeof("TracerPid:") - 1) == 0) {
+      traced = strtol(line + sizeof("TracerPid:") - 1, NULL, 10) != 0;
+      break;
+    }
+  }
+  fclose(status);
+  return traced;
+}
+
+static bool installUnameSyscallFilter(void) {
+  struct sock_filter filter[] = {
+      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_AARCH64, 0, 3),
+      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_uname, 0, 1),
+      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRACE | 1),
+      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+  };
+  struct sock_fprog program = {
+      .len = (unsigned short)(sizeof(filter) / sizeof(filter[0])),
+      .filter = filter};
+  unsigned int action = SECCOMP_RET_TRACE;
+  if (syscall(SYS_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &action) != 0 ||
+      prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0)
+    return false;
+  return syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &program) == 0;
+}
+
+static void installUnameSyscallTracer(void) {
+  const char *enabled = getenv("TERMUX_EXEC__UNAME_INTERCEPT");
+  if ((enabled != NULL && strcmp(enabled, "1") != 0) ||
+      processIsAlreadyTraced())
+    return;
+
+  char configuredHostname[sizeof(sInterceptedUname.nodename)];
+  if (uname(&sInterceptedUname) != 0 ||
+      termuxExec_getConfiguredHostname(configuredHostname,
+                                       sizeof(configuredHostname)) != 0)
+    return;
+  memcpy(sInterceptedUname.nodename, configuredHostname,
+         strlen(configuredHostname) + 1);
+
+  int readyPipe[2];
+  int startPipe[2];
+  if (pipe(readyPipe) != 0)
+    return;
+  if (pipe(startPipe) != 0) {
+    close(readyPipe[0]);
+    close(readyPipe[1]);
+    return;
+  }
+  pid_t tracerPid = fork();
+  if (tracerPid < 0) {
+    close(readyPipe[0]);
+    close(readyPipe[1]);
+    close(startPipe[0]);
+    close(startPipe[1]);
+    return;
+  }
+  if (tracerPid == 0) {
+    close(readyPipe[0]);
+    close(startPipe[1]);
+    traceProcessTree(getppid(), readyPipe[1], startPipe[0]);
+  }
+  close(readyPipe[1]);
+  close(startPipe[0]);
+  char ready = 0;
+  ssize_t readSize = read(readyPipe[0], &ready, sizeof(ready));
+  close(readyPipe[0]);
+  char start =
+      readSize == sizeof(ready) && ready == 1 && installUnameSyscallFilter();
+  (void)write(startPipe[1], &start, sizeof(start));
+  close(startPipe[1]);
+}
+
+__attribute__((constructor)) static void termuxExecInstallUnameTracer(void) {
+  installUnameSyscallTracer();
+}
+#endif
+
 
 
 

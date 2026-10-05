@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/syscall.h>
+#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -24,6 +26,7 @@
 #include <termux/termux_core__nos__c/v1/logger/Logger.h>
 #include <termux/termux_core__nos__c/v1/termux/shell/command/environment/TermuxShellEnvironment.h>
 #include <termux/termux_exec__nos__c/v1/termux/shell/command/environment/termux_exec/TermuxExecShellEnvironment.h>
+#include <termux/termux_exec__nos__c/v1/termux/api/termux_exec/service/ld_preload/TermuxExecLDPreload.h>
 #include <termux/termux_core__nos__c/v1/unix/file/UnixFileUtils.h>
 #include <termux/termux_core__nos__c/v1/unix/os/process/UnixForkUtils.h>
 #include <termux/termux_core__nos__c/v1/unix/shell/command/environment/UnixShellEnvironment.h>
@@ -49,6 +52,7 @@ static void runTests();
 
 
 #include "termux/api/termux_exec/service/ld_preload/direct/exec/ExecIntercept_RuntimeBinaryTests.c"
+#include "termux/api/termux_exec/service/ld_preload/TermuxExecLDPreload_RuntimeBinaryTests.c"
 
 
 
@@ -107,6 +111,7 @@ void runTests() {
 
 
     ExecIntercept_runTests();
+    TermuxExecLDPreload_runTests();
 
 
     if (stringEndsWith(termuxExec_tests_primaryLDPreloadFilePath, "/libtermux-exec-linker-ld-preload.so")) {
